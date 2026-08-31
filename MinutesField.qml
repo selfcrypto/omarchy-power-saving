@@ -35,7 +35,8 @@ QQC.SpinBox {
   from: 1
   to: 1440
   editable: true
-  width: Style.space(84)
+  // implicitWidth, not width: inside the row's RowLayout only the implicit size counts.
+  implicitWidth: Style.space(84)
   implicitHeight: Math.max(Style.spacing.controlHeight, Style.font.body + Style.spacing.controlPaddingY * 2)
   font.family: fontFamily
   font.pixelSize: Style.font.body
