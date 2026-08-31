@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.selfcrypto.power-saving",
+  "name": "Power Saving",
+  "version": "1.1.0",
+  "author": "Kike Ferrater",
+  "license": "MIT",
+  "description": "Idle power saving in three independent stages — screensaver, lock and suspend — each with its own switch and timeout, configured from a bar panel.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Power Saving",
+    "description": "Status icon with a panel to switch the screensaver, lock and suspend stages on or off and set how many idle minutes trigger each one. Right-click toggles stay-awake.",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
