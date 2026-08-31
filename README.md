@@ -5,8 +5,19 @@ stages — **screensaver**, **lock** and **suspend** — each with its own on/of
 switch and idle timeout, configured from a bar panel.
 
 Omarchy's stock idle service only knows screensaver + lock, cannot switch
-either off individually, and never suspends — which on a desktop means the
-machine never sleeps. This plugin replaces it.
+either off individually, and never suspends. This plugin replaces it.
+
+## Who it's for
+
+- **Desktop PCs** first of all. A desktop has no lid switch, and stock Omarchy
+  has no idle-suspend stage, so it simply never sleeps. This plugin gives it
+  the "suspend after N minutes idle" every other desktop OS has.
+- **Laptops left open.** Closing the lid already suspends (that's logind, not
+  this plugin), but a laptop sitting open on a desk never suspends on idle in
+  stock Omarchy either — and there it costs battery. The per-stage switches
+  ("screensaver but no lock at home") are useful on any machine.
+- Not yet: separate timeouts for battery and mains. One set of timeouts
+  applies whatever the power source.
 
 ## Preview
 

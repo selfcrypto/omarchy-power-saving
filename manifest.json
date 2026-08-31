@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.selfcrypto.power-saving",
   "name": "Power Saving",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "Kike Ferrater",
   "license": "MIT",
-  "description": "Idle power saving in three independent stages — screensaver, lock and suspend — each with its own switch and timeout, configured from a bar panel.",
+  "description": "Screensaver, lock and suspend on idle, each with its own switch and timeout — gives desktops the idle suspend Omarchy lacks.",
   "kinds": [
     "service",
     "bar-widget"
