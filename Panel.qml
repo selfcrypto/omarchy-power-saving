@@ -24,7 +24,6 @@ Panel {
   readonly property bool ready: svc !== null && svc !== undefined
   readonly property bool stayAwake: ready ? svc.stayAwake : false
   readonly property bool powerSaving: ready && !svc.stayAwake && !svc.stockIdleEnabled
-  readonly property bool standbyActive: ready ? svc.standbyActive : false
 
   // `number` is the key that toggles the stage; it runs across both groups.
   readonly property var displayStages: [
@@ -33,7 +32,7 @@ Panel {
   ]
   readonly property var systemStages: [
     { key: "lock", glyph: "󰌾", number: 3, hint: "Lock screen; the backlight drops 5 s later" },
-    { key: "suspend", glyph: "󰒲", number: 4, hint: "systemctl suspend; the session locks first" }
+    { key: "suspend", glyph: "󰒲", number: 4, hint: "Suspend through logind; the session locks first" }
   ]
   readonly property var stages: displayStages.concat(systemStages)
 
@@ -275,7 +274,7 @@ Panel {
 
           Text {
             Layout.fillWidth: true
-            text: root.standbyActive ? "Monitors off" : "Right now"
+            text: "Right now"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

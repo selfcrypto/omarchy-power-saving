@@ -153,7 +153,9 @@ Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
 - Hyprland ≥ 0.56 for the standby stage: it drives DPMS through the Lua
   dispatcher, `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`
   (the older `hyprctl dispatch dpms off` no longer parses there).
-- `systemctl suspend` must be permitted for the session (it is by default).
+- Sleep asks logind directly (the `org.freedesktop.login1` `Suspend` call,
+  the same one Omarchy's own Suspend menu entry makes), so it needs no
+  privileges and is refused while a sleep inhibitor is held.
 - No external services. No privileges beyond the user session.
 
 ## Notes

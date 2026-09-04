@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.selfcrypto.power-saving",
   "name": "Power Saving",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Kike Ferrater",
   "license": "MIT",
   "description": "Four idle stages with their own switch and timeout — screensaver and monitor standby for the display, lock and sleep for the system. Gives Omarchy the monitor standby and idle sleep it has no way to do.",

@@ -31,7 +31,7 @@ import "IdleModel.js" as IdleModel
 //                                  booleans (defaults: true / false / false)
 // The screensaver switch is Omarchy's own `screensaver-off` toggle
 // (`omarchy toggle screensaver`), so the menu and the panel agree. "Stay
-// awake" (`omarchy toggle idle`) pauses all three stages.
+// awake" (`omarchy toggle idle`) pauses all four stages.
 //
 // Screensaver and lock share one IdleMonitor armed at the earliest enabled
 // deadline and are staggered with timers, exactly as upstream does, because
@@ -260,7 +260,11 @@ Item {
   // also the only trustworthy read of the state (`hyprctl monitors` reports
   // dpmsStatus a dispatch behind). A toggle would be silently wrong here: two
   // stages racing, or a lost wake, would leave the desktop dark. With `action`
-  // the dispatch is idempotent, so a redundant "on" costs nothing.
+  // the dispatch is idempotent, so a redundant "on" costs nothing — which is
+  // also why neither call is gated on standbyActive: Hyprland wakes the
+  // monitors itself on input, and a service that still believed them off
+  // would refuse the next standby. standbyActive only records the last
+  // dispatch, for the status output.
   //
   // Monitors also come back on their own on key press or mouse move —
   // misc.key_press_enables_dpms and misc.mouse_move_enables_dpms are on in
@@ -272,7 +276,6 @@ Item {
   readonly property string dpmsOnCommand: "hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = \"on\"}))'"
 
   function standbyDisplays(reason) {
-    if (root.standbyActive) return
     root.standbyActive = true
     root.lastStandbyAt = nowIso()
     logEvent("standby", "displays off (" + (reason || "requested") + ")")
@@ -283,7 +286,6 @@ Item {
   // frames, so its Wayland client throttles itself, and killing it would look
   // like the user dismissed it and cancel a pending lock.
   function wakeDisplays(reason) {
-    if (!root.standbyActive) return
     root.standbyActive = false
     logEvent("standby", "displays on (" + (reason || "requested") + ")")
     runProcess(standbyOnProcess, "standby-on", root.dpmsOnCommand)
@@ -300,6 +302,10 @@ Item {
 
   // --------------------------------------------------------------- suspend
 
+  // Suspend is asked of logind directly: the org.freedesktop.login1 Suspend
+  // call, which is what Omarchy's own Suspend menu entry ends up making too.
+  readonly property string suspendCommand: "busctl call org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager Suspend b true"
+
   function suspendSystem(reason) {
     logEvent("suspend-system", reason || "requested")
     root.lastSuspendAt = nowIso()
@@ -308,8 +314,9 @@ Item {
     wakeDisplays("suspend")
     // omarchy-sleep-lock.service locks the session on PrepareForSleep, so no
     // lock call is needed here. logind refuses while a sleep inhibitor is
-    // held; the exit code lands in the log either way.
-    runProcess(suspendProcess, "suspend", "systemctl suspend")
+    // held ("Operation denied due to active block inhibitor"); the exit code
+    // lands in the log either way.
+    runProcess(suspendProcess, "suspend", root.suspendCommand)
   }
 
   function handleSuspendIdleChanged() {
@@ -532,7 +539,7 @@ Item {
     id: monitorComponent
 
     IdleMonitor {
-      // "cycle" (screensaver + lock) or "suspend"; "retired" once replaced so
+      // "cycle" (screensaver + lock), "standby" or "suspend"; "retired" once replaced so
       // a signal from a monitor awaiting deletion cannot reach a handler.
       property string stage: ""
       respectInhibitors: true
@@ -743,7 +750,7 @@ Item {
       return root.setIdleEnabled(!root.idleEnabled)
     }
 
-    // omarchy-shell idle stage <screensaver|lock|suspend> [on|off|toggle|status]
+    // omarchy-shell idle stage <screensaver|standby|lock|suspend> [on|off|toggle|status]
     function stage(name: string, action: string): string {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       var act = String(action || "status")
@@ -753,7 +760,7 @@ Item {
       return root.stageEnabled(name) ? "on" : "off"
     }
 
-    // omarchy-shell idle timeout <screensaver|lock|suspend> [seconds]
+    // omarchy-shell idle timeout <screensaver|standby|lock|suspend> [seconds]
     function timeout(name: string, seconds: string): string {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       if (String(seconds || "") === "") return String(root.stageTimeout(name))
