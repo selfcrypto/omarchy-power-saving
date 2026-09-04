@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.selfcrypto.power-saving",
   "name": "Power Saving",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "author": "Kike Ferrater",
   "license": "MIT",
-  "description": "Screensaver, lock and suspend on idle, each with its own switch and timeout — gives desktops the idle suspend Omarchy lacks.",
+  "description": "Four idle stages with their own switch and timeout — screensaver and monitor standby for the display, lock and sleep for the system. Gives Omarchy the monitor standby and idle sleep it has no way to do.",
   "kinds": [
     "service",
     "bar-widget"
@@ -17,7 +17,7 @@
   },
   "barWidget": {
     "displayName": "Power Saving",
-    "description": "Status icon with a panel to switch the screensaver, lock and suspend stages on or off and set how many idle minutes trigger each one. Right-click toggles stay-awake.",
+    "description": "Status icon with a panel to switch the screensaver, standby, lock and sleep stages on or off and set how many idle minutes trigger each one. Right-click toggles stay-awake.",
     "category": "System",
     "allowMultiple": false,
     "defaultSection": "right"
