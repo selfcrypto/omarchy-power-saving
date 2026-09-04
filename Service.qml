@@ -136,14 +136,21 @@ Item {
     runProcess(screensaverProcess, "screensaver", "[[ $(omarchy-shell lock isLocked 2>/dev/null) == \"true\" ]] || omarchy-launch-screensaver")
   }
 
-  function lockSystem(reason) {
-    logEvent("lock-system", reason || "requested")
+  // Ends the screensaver/lock cycle without treating it as activity: no
+  // omarchy-system-wake, and a screensaver window closing afterwards is
+  // ignored because idledThisCycle is already false.
+  function endIdleCycle() {
     screensaverTimer.stop()
     lockTimer.stop()
     screensaverLaunchGraceTimer.stop()
     root.idledThisCycle = false
     root.screensaverStartedThisCycle = false
     resetScreensaverWindows()
+  }
+
+  function lockSystem(reason) {
+    logEvent("lock-system", reason || "requested")
+    endIdleCycle()
     runProcess(lockProcess, "lock", "omarchy-system-lock")
   }
 
@@ -312,11 +319,17 @@ Item {
     // Resume must not land on monitors this service left in DPMS off: the
     // machine would look dead until something happened to poke them.
     wakeDisplays("suspend")
-    // omarchy-sleep-lock.service locks the session on PrepareForSleep, so no
-    // lock call is needed here. logind refuses while a sleep inhibitor is
+    // omarchy-sleep-lock.service locks the session on PrepareForSleep, but
+    // that path only locks: it leaves a running screensaver alone, and with
+    // the lock stage off the screensaver used to outlive the suspend and greet
+    // the user on the desktop after the unlock. So the cycle is ended and
+    // omarchy-system-lock (lock + kill the screensaver, as the lock stage
+    // does) runs first, in the same shell as the suspend call so the suspend
+    // cannot overtake it. logind refuses the call while a sleep inhibitor is
     // held ("Operation denied due to active block inhibitor"); the exit code
     // lands in the log either way.
-    runProcess(suspendProcess, "suspend", root.suspendCommand)
+    endIdleCycle()
+    runProcess(suspendProcess, "suspend", "omarchy-system-lock; " + root.suspendCommand)
   }
 
   function handleSuspendIdleChanged() {

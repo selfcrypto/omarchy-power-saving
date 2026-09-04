@@ -96,9 +96,11 @@ service switches them back on explicitly when it sees activity, when standby is
 switched off with the screens already dark, and before suspending — a resume
 never lands on a black desktop.
 
-Sleep always locks first: Omarchy's `omarchy-sleep-lock.service` locks the
-session on `PrepareForSleep` whatever the lock stage says, so the machine wakes
-to the lock screen.
+Sleep always locks first, through the same `omarchy-system-lock` the lock
+stage uses, so a running screensaver is closed before the machine sleeps and
+it wakes to the lock screen, not to a screensaver behind the unlocked desktop.
+(Omarchy's own `omarchy-sleep-lock.service` locks on `PrepareForSleep` as well,
+whatever the lock stage says.)
 
 ## Configuration
 
