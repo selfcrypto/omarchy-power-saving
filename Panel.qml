@@ -68,7 +68,10 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  onOpenedChanged: if (opened) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  onOpenedChanged: {
+    keyCatcher.standbyPending = false
+    if (opened) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+  }
 
   // One stage row: glyph, name, what it does and when, minutes, switch. Both
   // groups use it, so the two sections cannot drift apart.
@@ -181,18 +184,46 @@ Panel {
     contentWidth: panel.fittedContentWidth(Style.space(360))
     contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(580))
 
-    PanelKeyCatcher {
+    // Not the stock PanelKeyCatcher: it fires on key press only, and turns
+    // lowercase "l" into a cursor move before any panel sees it. Two things
+    // matter here. Omarchy ships misc.key_press_enables_dpms on, so monitors
+    // switched off on the press of "o" came straight back on its release;
+    // standby therefore runs on the release, which Hyprland has already seen
+    // with the monitors still on. And lock is on "k" because "l" never
+    // arrives as text through the stock catcher.
+    Item {
       id: keyCatcher
       anchors.fill: parent
-      onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.switchPanel(direction) }
-      onTextKey: function(t) {
+      focus: true
+      Keys.priority: Keys.BeforeItem
+
+      property bool standbyPending: false
+
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) { root.close(); event.accepted = true; return }
+        if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
+          root.switchPanel((event.modifiers & Qt.ShiftModifier) || event.key === Qt.Key_Backtab ? -1 : 1)
+          event.accepted = true
+          return
+        }
+        var t = event.text
+        if (!t || t.length !== 1) return
         var n = parseInt(t, 10)
         if (t === "t" || t === "T") root.togglePowerSaving()
         else if (n >= 1 && n <= root.stages.length) root.toggleStage(root.stages[n - 1].key)
-        else if (t === "o" || t === "O") root.standbyNow()
-        else if (t === "l" || t === "L") root.lockNow()
+        else if (t === "o" || t === "O") keyCatcher.standbyPending = true
+        else if (t === "k" || t === "K") root.lockNow()
         else if (t === "s" || t === "S") root.suspendNow()
+        else return
+        event.accepted = true
+      }
+
+      Keys.onReleased: function(event) {
+        if (!keyCatcher.standbyPending || event.isAutoRepeat) return
+        if (event.text !== "o" && event.text !== "O") return
+        keyCatcher.standbyPending = false
+        event.accepted = true
+        root.standbyNow()
       }
 
       Column {
@@ -314,7 +345,7 @@ Panel {
           spacing: Style.space(2)
 
           Repeater {
-            model: ["t stay awake · 1-4 stages", "o monitors · l lock · s sleep"]
+            model: ["t stay awake · 1-4 stages", "o monitors · k lock · s sleep"]
             delegate: Text {
               required property string modelData
               width: parent.width

@@ -282,6 +282,18 @@ Item {
   readonly property string dpmsOffCommand: "hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = \"off\"}))'"
   readonly property string dpmsOnCommand: "hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = \"on\"}))'"
 
+  // The IPC standby is what a Hyprland keybind would call, and binds fire on
+  // the key press: with misc.key_press_enables_dpms on, the release that
+  // follows would switch the monitors straight back on. A short deferral
+  // lets the release land first. (The panel's own "o" key runs on release
+  // for the same reason and needs no delay.)
+  Timer {
+    id: ipcStandbyTimer
+    interval: 500
+    repeat: false
+    onTriggered: root.standbyDisplays("ipc")
+  }
+
   function standbyDisplays(reason) {
     root.standbyActive = true
     root.lastStandbyAt = nowIso()
@@ -788,7 +800,7 @@ Item {
     // omarchy-shell idle standby  → monitors off now
     // omarchy-shell idle wake     → and back on
     function standby(): string {
-      root.standbyDisplays("ipc")
+      ipcStandbyTimer.restart()
       return "ok"
     }
 
