@@ -345,7 +345,7 @@ Panel {
           spacing: Style.space(2)
 
           Repeater {
-            model: ["t stay awake · 1-4 stages", "o monitors · k lock · s sleep"]
+            model: ["t stay awake · 1-4 stage on/off", "run now: o standby · k lock · s sleep"]
             delegate: Text {
               required property string modelData
               width: parent.width

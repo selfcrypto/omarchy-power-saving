@@ -87,7 +87,7 @@ omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable
 - **Left-click** the bar icon: open the panel.
 - **Right-click**: toggle *stay awake*.
 - In the panel, each stage row has a minutes field and a switch. Keys:
-  `t` stay awake, `1`–`4` toggle a stage, `o` monitors off now, `k` lock now,
+  `t` stay awake, `1`–`4` toggle a stage, `o` standby now, `k` lock now,
   `s` sleep now.
 
 Monitors come back on a key press or a mouse move (Omarchy ships
@@ -140,7 +140,7 @@ omarchy-shell idle status                       # JSON: stages, monitors, last e
 omarchy-shell idle stage standby on             # on | off | toggle | status
 omarchy-shell idle timeout standby 900          # seconds (min 10)
 omarchy-shell idle timeout standby ""           # print the current value
-omarchy-shell idle standby                      # monitors off now
+omarchy-shell idle standby                      # standby (monitors off) now
 omarchy-shell idle wake                         # monitors on now
 omarchy-shell idle suspend                      # sleep now
 omarchy-shell idle enable | disable | toggle    # stay-awake, as upstream
