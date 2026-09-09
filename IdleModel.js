@@ -119,6 +119,57 @@ function compactSummaryText(stages) {
   return parts.join(" → ")
 }
 
+// ---------------------------------------------------------------- config
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled"]
+
+// Inline settings of one bar entry (`{ id, ...settings }` in bar.layout.*),
+// without the id; {} when the entry is absent, so reads fall back.
+function barEntrySettings(barConfig, id) {
+  var layout = barConfig && barConfig.layout ? barConfig.layout : null
+  if (!layout) return {}
+  var sections = ["left", "center", "right"]
+  for (var s = 0; s < sections.length; s++) {
+    var entries = Array.isArray(layout[sections[s]]) ? layout[sections[s]] : []
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i]
+      if (!entry || String(entry.id || "") !== String(id)) continue
+      var out = {}
+      for (var key in entry) if (key !== "id") out[key] = entry[key]
+      return out
+    }
+  }
+  return {}
+}
+
+// Stage keys in effect: the entry's value wins, then the stock idle block.
+// A key missing from both stays missing so Service.qml's defaults apply.
+function mergedStageConfig(entrySettings, idleConfig) {
+  var out = {}
+  for (var i = 0; i < STAGE_KEYS.length; i++) {
+    var key = STAGE_KEYS[i]
+    if (entrySettings && entrySettings[key] !== undefined) out[key] = entrySettings[key]
+    else if (idleConfig && idleConfig[key] !== undefined) out[key] = idleConfig[key]
+  }
+  return out
+}
+
+// What a write puts on the entry: whatever else it carries, plus every stage
+// key currently in effect, so the first write migrates the idle block.
+function stageSettingsFor(entrySettings, stageConfig) {
+  var out = {}
+  for (var key in entrySettings || {}) out[key] = entrySettings[key]
+  for (var i = 0; i < STAGE_KEYS.length; i++) {
+    var stageKey = STAGE_KEYS[i]
+    if (stageConfig && stageConfig[stageKey] !== undefined) out[stageKey] = stageConfig[stageKey]
+  }
+  return out
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     secondsFromConfig: secondsFromConfig,
@@ -132,6 +183,11 @@ if (typeof module !== "undefined") {
     firstTimeout: firstTimeout,
     durationText: durationText,
     summaryText: summaryText,
-    compactSummaryText: compactSummaryText
+    compactSummaryText: compactSummaryText,
+    isObject: isObject,
+    STAGE_KEYS: STAGE_KEYS,
+    barEntrySettings: barEntrySettings,
+    mergedStageConfig: mergedStageConfig,
+    stageSettingsFor: stageSettingsFor
   }
 }

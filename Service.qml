@@ -11,8 +11,11 @@ import "IdleModel.js" as IdleModel
 //   system:  lock → sleep (suspend)
 // Derived from Omarchy's omarchy.idle service, which only knows screensaver +
 // lock and has no way to switch either off, and extended; Panel.qml is the bar
-// widget that drives it. It replaces omarchy.idle, so this service disables the
-// stock one on sight (once per shell session) rather than lock and launch the
+// widget that drives it. It replaces omarchy.idle: the manifest declares it a
+// clone of that service, so enabling this plugin has the host switch the stock
+// one off and removing it brings the stock one back. On hosts without that
+// clone handling (before Omarchy 4.0.3) this service still disables the stock
+// one on sight (once per shell session) rather than lock and launch the
 // screensaver twice; re-enable it by hand and this service says it is paused.
 //
 // Nothing in Omarchy ever turns a monitor off: the lock screen's "blank" is
@@ -22,9 +25,14 @@ import "IdleModel.js" as IdleModel
 // itself. Hyprland 0.56 dropped the plain-string dispatch form ("dpms off" now
 // parses as Lua), which is why it goes through `hyprctl eval`.
 //
-// Config lives in the `idle` block of ~/.config/omarchy/shell.json, keeping
-// the stock keys with their stock meaning so omarchy.idle still reads them
-// if this plugin is ever removed:
+// Config is stored inline on this plugin's bar entry in
+// ~/.config/omarchy/shell.json (`omarchy bar set io.github.selfcrypto.power-saving
+// suspend 1200` writes the same keys). That is the one place a third-party
+// plugin may write since Omarchy 4.0.3 scoped the shell object handed to
+// plugins (`mutateShellConfig` is reserved for full-bar plugins there). Keys
+// missing from the entry fall back to the stock `idle` block, which the host
+// shares with this plugin because it is a clone of omarchy.idle
+// (`shell.idleConfig`), so an older install migrates on its first write:
 //   screensaver / lock / suspend   seconds since idle began (stock keys)
 //   standby                        seconds since idle began (ours)
 //   lockEnabled / suspendEnabled / standbyEnabled
@@ -55,19 +63,41 @@ Item {
   readonly property int defaultStandbySeconds: 600
   readonly property int defaultSuspendSeconds: 1800
   readonly property int minTimeoutSeconds: 10
-  readonly property var idleConfig: shell && shell.shellConfig && shell.shellConfig.idle ? shell.shellConfig.idle : ({})
-  readonly property int screensaverTimeoutSeconds: secondsFromConfig(idleConfig.screensaver, defaultScreensaverSeconds)
-  readonly property int lockTimeoutSeconds: secondsFromConfig(idleConfig.lock, defaultLockSeconds)
-  readonly property int standbyTimeoutSeconds: secondsFromConfig(idleConfig.standby, defaultStandbySeconds)
-  readonly property int suspendTimeoutSeconds: secondsFromConfig(idleConfig.suspend, defaultSuspendSeconds)
-  readonly property bool lockEnabled: IdleModel.boolFromConfig(idleConfig.lockEnabled, true)
-  readonly property bool standbyEnabled: IdleModel.boolFromConfig(idleConfig.standbyEnabled, false)
-  readonly property bool suspendEnabled: IdleModel.boolFromConfig(idleConfig.suspendEnabled, false)
+  readonly property string pluginId: "io.github.selfcrypto.power-saving"
+  readonly property string shellConfigPath: home + "/.config/omarchy/shell.json"
+  // shell.json as read from disk (null until loaded or when there is none).
+  // The host does hand plugins `barConfig` / `idleConfig` snapshots, but in
+  // Omarchy 4.0.3 it refreshes them inside its own config-change handler,
+  // before the derived `barConfig` binding has caught up, so a plugin sees
+  // its own write only at the next config event. Watching the file the way
+  // the host itself does is what makes a panel edit take effect at once.
+  property var fileConfig: null
+  // Stock `idle` block: the file first, then whatever the host hands over
+  // (the trusted shell on older hosts, the clone snapshot `shell.idleConfig`
+  // on 4.0.3+). Read-only here: the fallback for keys the bar entry lacks.
+  readonly property var idleConfig: fileConfig && IdleModel.isObject(fileConfig.idle) ? fileConfig.idle
+    : (shell && shell.shellConfig && shell.shellConfig.idle ? shell.shellConfig.idle
+    : (shell && shell.idleConfig ? shell.idleConfig : ({})))
+  // This plugin's own settings, inline on its bar entry in the layout.
+  readonly property var entrySettings: IdleModel.barEntrySettings(
+    fileConfig && IdleModel.isObject(fileConfig.bar) ? fileConfig.bar : (shell ? shell.barConfig : null), pluginId)
+  readonly property var stageConfig: IdleModel.mergedStageConfig(entrySettings, idleConfig)
+  readonly property int screensaverTimeoutSeconds: secondsFromConfig(stageConfig.screensaver, defaultScreensaverSeconds)
+  readonly property int lockTimeoutSeconds: secondsFromConfig(stageConfig.lock, defaultLockSeconds)
+  readonly property int standbyTimeoutSeconds: secondsFromConfig(stageConfig.standby, defaultStandbySeconds)
+  readonly property int suspendTimeoutSeconds: secondsFromConfig(stageConfig.suspend, defaultSuspendSeconds)
+  readonly property bool lockEnabled: IdleModel.boolFromConfig(stageConfig.lockEnabled, true)
+  readonly property bool standbyEnabled: IdleModel.boolFromConfig(stageConfig.standbyEnabled, false)
+  readonly property bool suspendEnabled: IdleModel.boolFromConfig(stageConfig.suspendEnabled, false)
   readonly property bool screensaverEnabled: screensaverToggleLoaded && !screensaverOff
   readonly property int firstIdleTimeoutSeconds: IdleModel.firstTimeout(screensaverEnabled, screensaverTimeoutSeconds, lockEnabled, lockTimeoutSeconds)
   readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
   readonly property int lockDelaySeconds: Math.max(0, lockTimeoutSeconds - firstIdleTimeoutSeconds)
-  // Re-evaluated on every registry change (registryRevision is the tick).
+  // Only a host that hands this service the real registry (before Omarchy
+  // 4.0.3) can answer this; from 4.0.3 the scoped shell carries no registry and
+  // the host itself keeps omarchy.idle off while its clone is enabled, so this
+  // stays false there. Re-evaluated on every registry change (registryRevision
+  // is the tick).
   readonly property bool stockIdleEnabled: {
     if (!shell || !shell.pluginRegistry) return false
     var revision = shell.pluginRegistry.registryRevision
@@ -425,19 +455,23 @@ Item {
 
   // ---------------------------------------------------------- persistence
 
-  // Writes go through the shell's own shell.json writer; the new config is
-  // pushed back into `idleConfig`, which is what re-arms the monitors.
+  // Writes go through the shell's own shell.json writer, as the inline
+  // settings of this plugin's bar entry: the one config a scoped plugin may
+  // write, and the same thing `omarchy bar set` edits. The entry is written
+  // whole, so every stage key lands on it the first time and the stock `idle`
+  // block stops mattering. The host pushes the new layout back into
+  // `shell.barConfig`, which is what re-arms the monitors.
   function mutateIdleConfig(label, mutate) {
-    if (!root.shell || typeof root.shell.mutateShellConfig !== "function") {
+    if (!root.shell || typeof root.shell.updateEntryInline !== "function") {
       logEvent("config-write-skipped", label + " (no shell)")
       return false
     }
-    root.shell.mutateShellConfig(function(config) {
-      if (!config.idle || typeof config.idle !== "object" || Array.isArray(config.idle)) config.idle = {}
-      mutate(config.idle)
-    })
-    logEvent("config", label)
-    return true
+    var next = IdleModel.stageSettingsFor(root.entrySettings, root.stageConfig)
+    mutate(next)
+    if (JSON.stringify(next) === JSON.stringify(root.entrySettings)) return true
+    var written = root.shell.updateEntryInline(root.pluginId, next)
+    logEvent(written === false ? "config-write-rejected" : "config", label)
+    return written !== false
   }
 
   function setStageTimeout(name, seconds) {
@@ -490,6 +524,16 @@ Item {
 
   function refreshStayAwakeState() {
     if (!stayAwakeStateProbe.running) stayAwakeStateProbe.running = true
+  }
+
+  function applyShellConfigText(text) {
+    var parsed = null
+    try {
+      var candidate = JSON.parse(String(text || ""))
+      if (IdleModel.isObject(candidate)) parsed = candidate
+    } catch (error) {
+    }
+    root.fileConfig = parsed
   }
 
   function refreshScreensaverToggle() {
@@ -733,6 +777,18 @@ Item {
   Process {
     id: screensaverToggleWriter
     onExited: function() { root.refreshScreensaverToggle() }
+  }
+
+  // Same watch the host keeps on its config: reload on every outside write
+  // (the host's own writes included, they come from another FileView).
+  FileView {
+    id: shellConfigFile
+    path: root.shellConfigPath
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.applyShellConfigText(text())
+    onLoadFailed: function(error) { root.fileConfig = null }
+    onFileChanged: reload()
   }
 
   FileView {

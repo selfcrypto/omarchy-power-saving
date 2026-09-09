@@ -19,15 +19,15 @@ suspends. This plugin replaces it.
 omarchy plugin add https://github.com/selfcrypto/omarchy-power-saving.git --enable
 ```
 
-That is the whole installation. Enabling this plugin disables the stock
-`omarchy.idle` service for you (it is the service this one replaces — leaving
-both on would lock and launch the screensaver twice) and says so in a
-notification. Nothing else is touched: your existing `idle.screensaver` /
-`idle.lock` values in `shell.json` keep their meaning.
+That is the whole installation. The plugin is declared a clone of the stock
+`omarchy.idle` service (the one it replaces — leaving both on would lock and
+launch the screensaver twice), so enabling it switches the stock service off
+and removing it switches the stock service back on; Omarchy handles both.
+Your existing `idle.screensaver` / `idle.lock` values in `shell.json` are
+picked up as the starting point.
 
-If you re-enable `omarchy.idle` by hand later, this plugin steps aside and
-pauses itself instead of fighting you for the setting; the panel and a
-notification say so.
+Re-enabling `omarchy.idle` by hand later takes this plugin out of the bar
+again, the same way Omarchy treats any other clone.
 
 Verify:
 
@@ -42,7 +42,8 @@ Update:
 omarchy plugin update io.github.selfcrypto.power-saving
 ```
 
-Remove (restores the stock service):
+Remove (the stock service comes back on its own; the second command only
+matters for an install that predates 1.3.0):
 
 ```bash
 omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable omarchy.idle
@@ -104,11 +105,17 @@ whatever the lock stage says.)
 
 ## Configuration
 
-Everything lives in the `idle` block of `~/.config/omarchy/shell.json` and is
-written by the panel; the stock keys keep their stock meaning.
+Everything is stored inline on this plugin's entry in the bar layout of
+`~/.config/omarchy/shell.json`, written by the panel or by `omarchy bar set`:
+
+```bash
+omarchy bar set io.github.selfcrypto.power-saving suspend 1800
+omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
+```
 
 ```json
-"idle": {
+{
+  "id": "io.github.selfcrypto.power-saving",
   "screensaver": 300,
   "standby": 600,
   "lock": 1200,
@@ -118,6 +125,12 @@ written by the panel; the stock keys keep their stock meaning.
   "suspendEnabled": true
 }
 ```
+
+A key missing from the entry falls back to the stock `idle` block of
+`shell.json`, so the timeouts you had before still apply, and the first edit
+from the panel copies the whole set onto the entry. (Since Omarchy 4.0.3 a
+third-party plugin may write its own bar entry and nothing else, which is why
+the `idle` block is read but no longer written.)
 
 | Key | Meaning | Default |
 |---|---|---|
@@ -151,7 +164,8 @@ Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
 
 ## Requirements and dependencies
 
-- Omarchy with the Quickshell shell (`omarchy-shell`); no extra packages.
+- Omarchy 4.0.3 or later (the release that scopes what a plugin may read and
+  write; 1.3.0 is built for that API); no extra packages.
 - Hyprland ≥ 0.56 for the standby stage: it drives DPMS through the Lua
   dispatcher, `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`
   (the older `hyprctl dispatch dpms off` no longer parses there).
@@ -175,9 +189,13 @@ Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
 - Standby leaves a running screensaver alone: a monitor in DPMS off gets no
   frames, so its client throttles itself, and killing it would look like you
   dismissed it and would cancel the pending lock.
-- While this plugin replaces `omarchy.idle`, the stock coffee-cup indicator in
-  `omarchy.indicators` does nothing (it looks the service up by the stock id);
-  use this widget's right-click instead.
+- The stock coffee-cup indicator in `omarchy.indicators` follows this plugin
+  (Omarchy resolves the stock id to the enabled clone), so it and this
+  widget's right-click toggle the same stay-awake flag.
+- The service reads `shell.json` itself instead of the `barConfig` snapshot
+  the host hands plugins: in 4.0.3 that snapshot is refreshed one config
+  event late, so a panel edit would only show up after the next unrelated
+  write.
 
 ## License
 
