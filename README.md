@@ -95,7 +95,9 @@ Monitors come back on a key press or a mouse move (Omarchy ships
 `misc.key_press_enables_dpms` and `misc.mouse_move_enables_dpms` on), and this
 service switches them back on explicitly when it sees activity, when standby is
 switched off with the screens already dark, and before suspending — a resume
-never lands on a black desktop.
+never lands on a black desktop. Standby ends a running screensaver and none
+starts while the monitors are dark (see the notes below for why); the lock
+stage keeps its own timer either way.
 
 Sleep always locks first, through the same `omarchy-system-lock` the lock
 stage uses, so a running screensaver is closed before the machine sleeps and
@@ -186,9 +188,15 @@ Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
   wake into a blank. `hyprctl monitors` is no help in spotting it either: its
   `dpmsStatus` lags a dispatch behind. `/sys/class/drm/*/dpms` is the honest
   read.
-- Standby leaves a running screensaver alone: a monitor in DPMS off gets no
-  frames, so its client throttles itself, and killing it would look like you
-  dismissed it and would cancel the pending lock.
+- Standby closes a running screensaver and no screensaver starts while the
+  monitors are off. A DisplayPort monitor in DPMS off can drop its link and be
+  reported unplugged; Hyprland then removes it from the layout, and a
+  screensaver window that lives through that comes back on the monitor with
+  a stale input box: painted over everything, clicks falling through to the
+  desktop behind it. Closing it this way is not a dismissal, so a pending
+  lock still fires on time; and it happens before the DPMS off, because the
+  screensaver's exit restores the cursor through a config keyword, which has
+  Hyprland switch the monitors back on.
 - The stock coffee-cup indicator in `omarchy.indicators` follows this plugin
   (Omarchy resolves the stock id to the enabled clone), so it and this
   widget's right-click toggle the same stay-awake flag.

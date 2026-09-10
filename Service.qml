@@ -160,10 +160,34 @@ Item {
 
   // ------------------------------------------------------ screensaver/lock
 
+  // Never onto dark monitors. A DisplayPort monitor in DPMS off can drop its
+  // link and be reported unplugged: Hyprland then removes it, so a screensaver
+  // started meanwhile opens into a one-monitor layout, and when the monitor
+  // returns on input the window is carried back with a stale input box —
+  // painted over the whole monitor, clicks falling through to the desktop.
+  // Nothing is lost by skipping it: the input that wakes the monitors ends
+  // the cycle anyway, and the lock stage keeps its own timer. The state is
+  // read from sysfs at launch time (the one honest read, see standby below):
+  // standbyActive only remembers this service's last dispatch, and Hyprland
+  // wakes the monitors on input without telling anyone.
+  // A connector without a readable dpms attribute counts as on, and so does
+  // a system that exposes no connected connector at all: when the state
+  // cannot be read the screensaver launches as it always did.
+  readonly property string displaysOnCheck: "on=0 seen=0; for c in /sys/class/drm/card*-*; do [[ -r $c/status && $(<$c/status) == connected ]] || continue; seen=1; [[ -r $c/dpms && $(<$c/dpms) != On ]] || on=1; done; ((seen && !on)) && exit 3"
+  readonly property int screensaverSkippedExitCode: 3
+
   function launchScreensaver() {
     root.screensaverStartedThisCycle = true
     screensaverLaunchGraceTimer.restart()
-    runProcess(screensaverProcess, "screensaver", "[[ $(omarchy-shell lock isLocked 2>/dev/null) == \"true\" ]] || omarchy-launch-screensaver")
+    runProcess(screensaverProcess, "screensaver", root.displaysOnCheck
+      + "; [[ $(omarchy-shell lock isLocked 2>/dev/null) == \"true\" ]] || omarchy-launch-screensaver")
+  }
+
+  function handleScreensaverLaunchExit(exitCode) {
+    if (exitCode !== root.screensaverSkippedExitCode) return
+    logEvent("screensaver-skip", "displays off")
+    screensaverLaunchGraceTimer.stop()
+    root.screensaverStartedThisCycle = false
   }
 
   // Ends the screensaver/lock cycle without treating it as activity: no
@@ -324,16 +348,31 @@ Item {
     onTriggered: root.standbyDisplays("ipc")
   }
 
+  // A running screensaver is closed when the monitors go dark, for the same
+  // reason none is started while they are (see launchScreensaver): its windows
+  // would ride the monitor that drops out and come back broken. Its windows
+  // are forgotten first so the closewindow events that follow do not read as
+  // the user dismissing it — the pending lock keeps its timer. The kill is
+  // the one omarchy-system-lock does, a no-op when nothing is running, and it
+  // runs in the same shell *ahead of* the DPMS off: omarchy-screensaver's
+  // exit handler restores the cursor through a Hyprland config keyword, and a
+  // config change has Hyprland re-apply monitor state, which switches DPMS
+  // back on. So the shell waits for the screensaver scripts to be gone before
+  // it turns the monitors off.
+  readonly property string screensaverStopCommand: "pkill -x ttfx 2>/dev/null || true; timeout 1s pidwait -x ttfx 2>/dev/null || true; pkill -f '[o]rg.omarchy.screensaver' 2>/dev/null || true; timeout 2s pidwait -f '[o]marchy-screensaver$' 2>/dev/null || true"
+
   function standbyDisplays(reason) {
     root.standbyActive = true
     root.lastStandbyAt = nowIso()
     logEvent("standby", "displays off (" + (reason || "requested") + ")")
-    runProcess(standbyOffProcess, "standby-off", root.dpmsOffCommand)
+    var tracked = root.screensaverWindowCount
+    screensaverLaunchGraceTimer.stop()
+    root.screensaverStartedThisCycle = false
+    resetScreensaverWindows()
+    logEvent("screensaver-stop", "standby (windows=" + tracked + ")")
+    runProcess(standbyOffProcess, "standby-off", root.screensaverStopCommand + "; " + root.dpmsOffCommand)
   }
 
-  // The screensaver is deliberately left running: a monitor in DPMS off gets no
-  // frames, so its Wayland client throttles itself, and killing it would look
-  // like the user dismissed it and cancel a pending lock.
   function wakeDisplays(reason) {
     root.standbyActive = false
     logEvent("standby", "displays on (" + (reason || "requested") + ")")
@@ -693,7 +732,10 @@ Item {
 
   Process {
     id: screensaverProcess
-    onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "screensaver exitCode=" + exitCode + " status=" + exitStatus) }
+    onExited: function(exitCode, exitStatus) {
+      root.logEvent("process-exit", "screensaver exitCode=" + exitCode + " status=" + exitStatus)
+      root.handleScreensaverLaunchExit(exitCode)
+    }
   }
   Process {
     id: lockProcess
