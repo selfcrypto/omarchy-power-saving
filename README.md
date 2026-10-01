@@ -4,7 +4,7 @@ Idle power saving for [Omarchy](https://omarchy.org) in four independent
 stages, grouped the way you think about them:
 
 - **Display** — **screensaver**, then **standby** (monitors off).
-- **System** — **lock**, then **sleep** (suspend).
+- **System** — **lock**, then **suspend**.
 
 Each stage has its own on/off switch and its own idle timeout, set from a bar
 panel.
@@ -53,7 +53,7 @@ omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable
 
 - **Desktop PCs** first of all. A desktop has no lid switch, and stock Omarchy
   has neither an idle-standby nor an idle-suspend stage, so the monitors stay
-  lit and the machine never sleeps. This plugin gives it both.
+  lit and the machine never suspends. This plugin gives it both.
 - **Laptops left open.** Closing the lid already suspends (that's logind, not
   this plugin), but a laptop sitting open on a desk never blanks its panel or
   suspends on idle in stock Omarchy either — and there it costs battery. The
@@ -68,13 +68,13 @@ omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable
 
 ## Features
 
-- Four stages — screensaver, standby, lock, sleep — each with a switch and a
+- Four stages — screensaver, standby, lock, suspend — each with a switch and a
   timeout in minutes of idle.
 - **Monitor standby that Omarchy does not otherwise have.** The lock screen's
   "blank" is `omarchy-brightness-display off`, which is backlight/DDC
   brightness on one monitor, not standby; this stage drives Hyprland's DPMS
   dispatcher, so the monitors actually power down.
-- Standby and sleep have an idle monitor each: both respect idle inhibitors (a
+- Standby and suspend have an idle monitor each: both respect idle inhibitors (a
   playing video keeps the screens on) and both survive the lock.
 - "Stay awake" pauses all four stages; it is the same flag as
   `omarchy toggle idle` and the coffee-cup indicator.
@@ -88,8 +88,12 @@ omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable
 - **Left-click** the bar icon: open the panel.
 - **Right-click**: toggle *stay awake*.
 - In the panel, each stage row has a minutes field and a switch. Keys:
-  `t` stay awake, `1`–`4` toggle a stage, `o` standby now, `k` lock now,
-  `s` sleep now.
+  `t` stay awake, `1`–`4` toggle a stage, `r` screensaver now, `o` standby now,
+  `k` lock now, `s` suspend now.
+
+The screensaver ends on a mouse move as well as on a key press. Omarchy's own
+only reacts to keys, so this service watches for input while one is up and
+closes it — whether an idle timeout started it or you did.
 
 Monitors come back on a key press or a mouse move (Omarchy ships
 `misc.key_press_enables_dpms` and `misc.mouse_move_enables_dpms` on), and this
@@ -99,8 +103,8 @@ never lands on a black desktop. Standby ends a running screensaver and none
 starts while the monitors are dark (see the notes below for why); the lock
 stage keeps its own timer either way.
 
-Sleep always locks first, through the same `omarchy-system-lock` the lock
-stage uses, so a running screensaver is closed before the machine sleeps and
+Suspend always locks first, through the same `omarchy-system-lock` the lock
+stage uses, so a running screensaver is closed before the machine suspends and
 it wakes to the lock screen, not to a screensaver behind the unlocked desktop.
 (Omarchy's own `omarchy-sleep-lock.service` locks on `PrepareForSleep` as well,
 whatever the lock stage says.)
@@ -139,9 +143,9 @@ the `idle` block is read but no longer written.)
 | `screensaver`, `standby`, `lock`, `suspend` | seconds of idle before the stage fires | 150, 600, 300, 1800 |
 | `lockEnabled` | lock stage on/off | `true` |
 | `standbyEnabled` | standby stage on/off | `false` |
-| `suspendEnabled` | sleep stage on/off | `false` |
+| `suspendEnabled` | suspend stage on/off | `false` |
 
-The sleep stage keeps the stock `suspend` key, so nothing else in Omarchy has
+The suspend stage uses the stock `suspend` key, so nothing else in Omarchy has
 to learn a new name. The screensaver switch is the flag file
 `~/.local/state/omarchy/toggles/screensaver-off` (`omarchy toggle screensaver`).
 
@@ -157,7 +161,8 @@ omarchy-shell idle timeout standby 900          # seconds (min 10)
 omarchy-shell idle timeout standby ""           # print the current value
 omarchy-shell idle standby                      # standby (monitors off) now
 omarchy-shell idle wake                         # monitors on now
-omarchy-shell idle suspend                      # sleep now
+omarchy-shell idle screensaver                  # screensaver now, even with the stage off
+omarchy-shell idle suspend                      # suspend now
 omarchy-shell idle enable | disable | toggle    # stay-awake, as upstream
 ```
 
@@ -171,7 +176,7 @@ Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
 - Hyprland ≥ 0.56 for the standby stage: it drives DPMS through the Lua
   dispatcher, `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`
   (the older `hyprctl dispatch dpms off` no longer parses there).
-- Sleep asks logind directly (the `org.freedesktop.login1` `Suspend` call,
+- Suspend asks logind directly (the `org.freedesktop.login1` `Suspend` call,
   the same one Omarchy's own Suspend menu entry makes), so it needs no
   privileges and is refused while a sleep inhibitor is held.
 - No external services. No privileges beyond the user session.
@@ -181,7 +186,7 @@ Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
 - Monitors are never reconfigured, only created and destroyed: Quickshell
   0.3.1 silently breaks an `IdleMonitor` whose timeout changes at runtime.
 - Screensaver and lock share one idle monitor, as the stock service does;
-  standby and sleep have one each, so they still fire after the lock.
+  standby and suspend have one each, so they still fire after the lock.
 - The DPMS action has to be passed as `{action = "off"}`. `hl.dsp.dpms("off")`
   builds a perfectly valid dispatcher, and every other shape tried does too —
   but the argument is then ignored and the dispatch *toggles*, which turns a

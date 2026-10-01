@@ -8,7 +8,7 @@ import "IdleModel.js" as IdleModel
 // Power-saving idle service in four stages, each with its own switch and
 // timeout, grouped the way they are presented in the panel:
 //   display: screensaver → standby (monitors off, DPMS)
-//   system:  lock → sleep (suspend)
+//   system:  lock → suspend
 // Derived from Omarchy's omarchy.idle service, which only knows screensaver +
 // lock and has no way to switch either off, and extended; Panel.qml is the bar
 // widget that drives it. It replaces omarchy.idle: the manifest declares it a
@@ -111,9 +111,11 @@ Item {
   property var cycleMonitor: null
   property var standbyMonitor: null
   property var suspendMonitor: null
+  property var dismissMonitor: null
   readonly property bool cycleIdle: cycleMonitor ? cycleMonitor.isIdle : false
   readonly property bool standbyIdle: standbyMonitor ? standbyMonitor.isIdle : false
   readonly property bool suspendIdle: suspendMonitor ? suspendMonitor.isIdle : false
+  readonly property bool dismissIdle: dismissMonitor ? dismissMonitor.isIdle : false
 
   property bool stayAwake: false
   property bool stayAwakeStateLoaded: false
@@ -183,6 +185,15 @@ Item {
       + "; [[ $(omarchy-shell lock isLocked 2>/dev/null) == \"true\" ]] || omarchy-launch-screensaver")
   }
 
+  // The screensaver on request (panel, IPC), outside any idle cycle: "force"
+  // starts it with the stage switched off too. An idle cycle that begins
+  // while it is still up adopts it — omarchy-launch-screensaver exits early
+  // when one is running, and its windows are already tracked.
+  function startScreensaver(reason) {
+    logEvent("screensaver-now", reason || "requested")
+    runProcess(screensaverProcess, "screensaver", root.displaysOnCheck + "; omarchy-launch-screensaver force")
+  }
+
   function handleScreensaverLaunchExit(exitCode) {
     if (exitCode !== root.screensaverSkippedExitCode) return
     logEvent("screensaver-skip", "displays off")
@@ -218,7 +229,7 @@ Item {
       + " lock=" + (root.lockEnabled ? root.lockTimeoutSeconds : "off"))
     root.idledThisCycle = true
     root.screensaverStartedThisCycle = false
-    resetScreensaverWindows()
+    // The tracked windows are kept: a screensaver started by hand may be up.
 
     if (root.screensaverEnabled) {
       if (root.screensaverDelaySeconds === 0) launchScreensaver()
@@ -247,17 +258,45 @@ Item {
   function resetScreensaverWindows() {
     root.screensaverWindows = ({})
     root.screensaverWindowCount = 0
+    syncDismissMonitor()
   }
 
   function setScreensaverWindow(address, visible) {
     var next = IdleModel.screensaverWindowsAfter(root.screensaverWindows, address, visible)
     root.screensaverWindows = next.windows
     root.screensaverWindowCount = next.count
+    syncDismissMonitor()
   }
 
   function handleScreensaverWindowOpened(address) {
+    dismissSettleTimer.restart()
     setScreensaverWindow(address, true)
     screensaverLaunchGraceTimer.stop()
+  }
+
+  // omarchy-screensaver only exits on a key press (it reads the terminal) or
+  // when its window loses focus; a mouse move reaches neither. The cycle
+  // monitor cannot stand in: its first "active" may be the launch itself (see
+  // handleActiveSignal) and it reports nothing more until its long timeout
+  // elapses again. So while screensaver windows are up a short idle monitor
+  // watches for input: armed once the launch has settled (the last window
+  // opened dismissSettleTimer ago, focus hopping between monitors is over),
+  // it first has to see the user still, and the activity after that — mouse
+  // or key — closes the screensaver. The closewindow events then end the
+  // idle cycle as any other dismissal does. It ignores idle inhibitors: a
+  // screensaver started by hand over a playing video is dismissed the same.
+  readonly property int dismissIdleSeconds: 1
+
+  function syncDismissMonitor() {
+    var wanted = root.screensaverWindowCount > 0 && !dismissSettleTimer.running
+    if (root.screensaverWindowCount === 0) dismissSettleTimer.stop()
+    root.dismissMonitor = armMonitor(root.dismissMonitor, wanted, root.dismissIdleSeconds, "dismiss")
+  }
+
+  function handleDismissIdleChanged() {
+    if (root.dismissIdle || root.screensaverWindowCount === 0) return
+    logEvent("screensaver-stop", "activity (windows=" + root.screensaverWindowCount + ")")
+    runProcess(screensaverStopProcess, "screensaver-stop", root.screensaverStopCommand)
   }
 
   function handleScreensaverWindowClosed(address) {
@@ -470,7 +509,8 @@ Item {
         standby: root.standbyMonitor !== null,
         standbyTimeout: root.standbyMonitor ? root.standbyMonitor.timeout : null,
         suspend: root.suspendMonitor !== null,
-        suspendTimeout: root.suspendMonitor ? root.suspendMonitor.timeout : null
+        suspendTimeout: root.suspendMonitor ? root.suspendMonitor.timeout : null,
+        dismiss: root.dismissMonitor !== null
       },
       timers: {
         screensaver: screensaverTimer.running,
@@ -647,14 +687,15 @@ Item {
     id: monitorComponent
 
     IdleMonitor {
-      // "cycle" (screensaver + lock), "standby" or "suspend"; "retired" once replaced so
-      // a signal from a monitor awaiting deletion cannot reach a handler.
+      // "cycle" (screensaver + lock), "standby", "suspend" or "dismiss" (input
+      // while the screensaver is up); "retired" once replaced so a signal from
+      // a monitor awaiting deletion cannot reach a handler.
       property string stage: ""
-      respectInhibitors: true
       onIsIdleChanged: {
         if (stage === "cycle") root.handleIdleChanged()
         else if (stage === "standby") root.handleStandbyIdleChanged()
         else if (stage === "suspend") root.handleSuspendIdleChanged()
+        else if (stage === "dismiss") root.handleDismissIdleChanged()
       }
     }
   }
@@ -667,7 +708,7 @@ Item {
       logEvent("monitor-disarm", stage)
     }
     if (!wanted) return null
-    var monitor = monitorComponent.createObject(root, { stage: stage, timeout: timeoutSeconds })
+    var monitor = monitorComponent.createObject(root, { stage: stage, timeout: timeoutSeconds, respectInhibitors: stage !== "dismiss" })
     if (!monitor) {
       logEvent("monitor-arm-failed", stage + " timeout=" + timeoutSeconds)
       return null
@@ -723,6 +764,13 @@ Item {
     }
   }
 
+  Timer {
+    id: dismissSettleTimer
+    interval: 1500
+    repeat: false
+    onRunningChanged: root.syncDismissMonitor()
+  }
+
   Connections {
     target: Hyprland
     function onRawEvent(event) { root.handleHyprlandEvent(event) }
@@ -736,6 +784,10 @@ Item {
       root.logEvent("process-exit", "screensaver exitCode=" + exitCode + " status=" + exitStatus)
       root.handleScreensaverLaunchExit(exitCode)
     }
+  }
+  Process {
+    id: screensaverStopProcess
+    onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "screensaver-stop exitCode=" + exitCode + " status=" + exitStatus) }
   }
   Process {
     id: lockProcess
@@ -888,6 +940,12 @@ Item {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       if (String(seconds || "") === "") return String(root.stageTimeout(name))
       return root.setStageTimeout(name, seconds) ? "ok" : "invalid timeout (min " + root.minTimeoutSeconds + " s)"
+    }
+
+    // omarchy-shell idle screensaver  → screensaver now, even with the stage off
+    function screensaver(): string {
+      root.startScreensaver("ipc")
+      return "ok"
     }
 
     function suspend(): string {

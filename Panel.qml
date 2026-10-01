@@ -7,7 +7,7 @@ import "IdleModel.js" as IdleModel
 
 // Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 // listing the four idle stages in the two groups they belong to — display
-// (screensaver, standby) and system (lock, sleep) — each with a switch and a
+// (screensaver, standby) and system (lock, suspend) — each with a switch and a
 // minutes field. All state lives in Service.qml, which the shell loads once;
 // this widget exists once per monitor and only reads from and calls into that
 // service, so the copies never disagree.
@@ -45,6 +45,7 @@ Panel {
   function togglePowerSaving() { if (ready) svc.setIdleEnabled(root.stayAwake) }
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
+  function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
   function standbyNow() { if (!ready) return; root.close(); svc.standbyDisplays("panel") }
 
   readonly property var stageList: {
@@ -197,7 +198,9 @@ Panel {
       focus: true
       Keys.priority: Keys.BeforeItem
 
-      property bool standbyPending: false
+      // "o" and "r" run on release: the release of a key pressed here would
+      // otherwise wake the monitors, or land after the panel has closed.
+      property string pendingKey: ""
 
       Keys.onPressed: function(event) {
         if (event.key === Qt.Key_Escape) { root.close(); event.accepted = true; return }
@@ -211,7 +214,7 @@ Panel {
         var n = parseInt(t, 10)
         if (t === "t" || t === "T") root.togglePowerSaving()
         else if (n >= 1 && n <= root.stages.length) root.toggleStage(root.stages[n - 1].key)
-        else if (t === "o" || t === "O") keyCatcher.standbyPending = true
+        else if (t === "o" || t === "O" || t === "r" || t === "R") keyCatcher.pendingKey = t.toLowerCase()
         else if (t === "k" || t === "K") root.lockNow()
         else if (t === "s" || t === "S") root.suspendNow()
         else return
@@ -219,11 +222,13 @@ Panel {
       }
 
       Keys.onReleased: function(event) {
-        if (!keyCatcher.standbyPending || event.isAutoRepeat) return
-        if (event.text !== "o" && event.text !== "O") return
-        keyCatcher.standbyPending = false
+        if (keyCatcher.pendingKey === "" || event.isAutoRepeat) return
+        if (String(event.text).toLowerCase() !== keyCatcher.pendingKey) return
+        var key = keyCatcher.pendingKey
+        keyCatcher.pendingKey = ""
         event.accepted = true
-        root.standbyNow()
+        if (key === "o") root.standbyNow()
+        else root.screensaverNow()
       }
 
       Column {
@@ -312,6 +317,15 @@ Panel {
           }
 
           PanelActionButton {
+            iconText: "󱄄"
+            tooltipText: "Screensaver now (r)"
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            enabled: root.ready
+            onClicked: root.screensaverNow()
+          }
+
+          PanelActionButton {
             iconText: "󰶐"
             tooltipText: "Monitors off now (o)"
             foreground: root.foreground
@@ -322,7 +336,7 @@ Panel {
 
           PanelActionButton {
             iconText: "󰌾"
-            tooltipText: "Lock now (l)"
+            tooltipText: "Lock now (k)"
             foreground: root.foreground
             fontFamily: root.fontFamily
             enabled: root.ready
@@ -331,7 +345,7 @@ Panel {
 
           PanelActionButton {
             iconText: "󰒲"
-            tooltipText: "Sleep now (s)"
+            tooltipText: "Suspend now (s)"
             foreground: root.foreground
             fontFamily: root.fontFamily
             enabled: root.ready
@@ -339,13 +353,13 @@ Panel {
           }
         }
 
-        // Two lines by hand: one string wraps mid-shortcut at this width.
+        // Three lines by hand: one string wraps mid-shortcut at this width.
         Column {
           width: parent.width
           spacing: Style.space(2)
 
           Repeater {
-            model: ["t stay awake · 1-4 stage on/off", "run now: o standby · k lock · s sleep"]
+            model: ["t stay awake · 1-4 stage on/off", "run now: r screensaver · o standby", "k lock · s suspend"]
             delegate: Text {
               required property string modelData
               width: parent.width

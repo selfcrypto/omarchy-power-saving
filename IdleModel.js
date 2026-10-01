@@ -55,15 +55,14 @@ function screensaverWindowsAfter(windows, address, visible) {
 
 // ---------------------------------------------------------------- stages
 
-// Firing order within a group is the panel's order; the config key of the
-// sleep stage stays "suspend" (the stock key) even though it reads "Sleep".
+// Firing order within a group is the panel's order.
 var STAGES = ["screensaver", "standby", "lock", "suspend"]
 
 var STAGE_LABELS = {
   screensaver: "Screensaver",
   standby: "Standby",
   lock: "Lock",
-  suspend: "Sleep"
+  suspend: "Suspend"
 }
 
 function isStage(name) {
