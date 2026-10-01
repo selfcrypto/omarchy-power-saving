@@ -135,7 +135,8 @@ Suspend:
   inhibitor is held.
 - Idle inhibitors are respected.
 
-Standby and suspend keep counting after the session is locked.
+All four timeouts count from the moment you went idle. Starting the
+screensaver or locking does not push the later stages back.
 
 ## Configuration
 
@@ -215,10 +216,16 @@ Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock` and
   0.3.1 breaks an `IdleMonitor` whose timeout changes at runtime.
 - Screensaver and lock share one idle monitor, as in the stock service.
   Standby and suspend have one each.
-- Mouse dismissal uses a fourth idle monitor with a 1 second timeout. It is
-  armed 1.5 seconds after the last screensaver window opens, and it ignores
-  idle inhibitors. Once it has reported idle, the next input closes the
-  screensaver.
+- The idle monitors only tell the service when you went idle. From then on
+  the stages run on timers counted from that moment. Hyprland resets every
+  idle monitor when the screensaver opens or closes and when the lock screen
+  comes up, so monitors alone would delay the later stages.
+- Activity reported while the service starts or closes the screensaver,
+  locks or turns the monitors off, and for 2.5 seconds after, is taken to be
+  that action and is ignored.
+- Your return is detected by a fourth idle monitor with a 1 second timeout
+  that ignores idle inhibitors. It is armed while you are away and while a
+  screensaver is up. This is also what ends the screensaver on a mouse move.
 - Standby calls
   `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`. The older
   `hyprctl dispatch dpms off` no longer parses on Hyprland 0.56. The action

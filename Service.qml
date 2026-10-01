@@ -44,8 +44,10 @@ import "IdleModel.js" as IdleModel
 // Screensaver and lock share one IdleMonitor armed at the earliest enabled
 // deadline and are staggered with timers, exactly as upstream does, because
 // locking ends that cycle (the lock plugin owns the screen from then on).
-// Standby and suspend get an IdleMonitor each so they survive the lock and fire
-// on the wall-clock idle time regardless of what the other stages did.
+// Standby and suspend get an IdleMonitor each, so each can be the first to
+// see the user go idle. Once that is known they run on timers counted from
+// that moment (see the away section), because the compositor resets the
+// monitors whenever this service opens or closes the screensaver or locks.
 // NOTE: after editing this file run `omarchy restart shell` — the hot reload
 // re-instantiates but keeps the old compiled QML.
 Item {
@@ -111,11 +113,11 @@ Item {
   property var cycleMonitor: null
   property var standbyMonitor: null
   property var suspendMonitor: null
-  property var dismissMonitor: null
+  property var watchMonitor: null
   readonly property bool cycleIdle: cycleMonitor ? cycleMonitor.isIdle : false
   readonly property bool standbyIdle: standbyMonitor ? standbyMonitor.isIdle : false
   readonly property bool suspendIdle: suspendMonitor ? suspendMonitor.isIdle : false
-  readonly property bool dismissIdle: dismissMonitor ? dismissMonitor.isIdle : false
+  readonly property bool watchIdle: watchMonitor ? watchMonitor.isIdle : false
 
   property bool stayAwake: false
   property bool stayAwakeStateLoaded: false
@@ -125,6 +127,14 @@ Item {
   property bool screensaverToggleLoaded: false
   property bool idledThisCycle: false
   property bool screensaverStartedThisCycle: false
+  // "Away": the stretch from the moment the user went idle (awaySince, epoch
+  // ms, 0 when they are here) until they touch something again. See the away
+  // section below.
+  property double awaySince: 0
+  readonly property bool away: awaySince > 0
+  property bool cycleDoneThisAway: false
+  property bool standbyFiredThisAway: false
+  property bool suspendFiredThisAway: false
   property bool standbyActive: false
   property bool autoDisabledStockIdle: false
   property string lastEvent: "starting"
@@ -181,6 +191,7 @@ Item {
   function launchScreensaver() {
     root.screensaverStartedThisCycle = true
     screensaverLaunchGraceTimer.restart()
+    markOwnAction()
     runProcess(screensaverProcess, "screensaver", root.displaysOnCheck
       + "; [[ $(omarchy-shell lock isLocked 2>/dev/null) == \"true\" ]] || omarchy-launch-screensaver")
   }
@@ -191,6 +202,7 @@ Item {
   // when one is running, and its windows are already tracked.
   function startScreensaver(reason) {
     logEvent("screensaver-now", reason || "requested")
+    markOwnAction()
     runProcess(screensaverProcess, "screensaver", root.displaysOnCheck + "; omarchy-launch-screensaver force")
   }
 
@@ -216,6 +228,8 @@ Item {
   function lockSystem(reason) {
     logEvent("lock-system", reason || "requested")
     endIdleCycle()
+    root.cycleDoneThisAway = root.away
+    markOwnAction()
     runProcess(lockProcess, "lock", "omarchy-system-lock")
   }
 
@@ -258,57 +272,29 @@ Item {
   function resetScreensaverWindows() {
     root.screensaverWindows = ({})
     root.screensaverWindowCount = 0
-    syncDismissMonitor()
+    syncWatchMonitor()
   }
 
   function setScreensaverWindow(address, visible) {
     var next = IdleModel.screensaverWindowsAfter(root.screensaverWindows, address, visible)
     root.screensaverWindows = next.windows
     root.screensaverWindowCount = next.count
-    syncDismissMonitor()
+    syncWatchMonitor()
   }
 
   function handleScreensaverWindowOpened(address) {
-    dismissSettleTimer.restart()
+    markOwnAction()
     setScreensaverWindow(address, true)
     screensaverLaunchGraceTimer.stop()
   }
 
-  // omarchy-screensaver only exits on a key press (it reads the terminal) or
-  // when its window loses focus; a mouse move reaches neither. The cycle
-  // monitor cannot stand in: its first "active" may be the launch itself (see
-  // handleActiveSignal) and it reports nothing more until its long timeout
-  // elapses again. So while screensaver windows are up a short idle monitor
-  // watches for input: armed once the launch has settled (the last window
-  // opened dismissSettleTimer ago, focus hopping between monitors is over),
-  // it first has to see the user still, and the activity after that — mouse
-  // or key — closes the screensaver. The closewindow events then end the
-  // idle cycle as any other dismissal does. It ignores idle inhibitors: a
-  // screensaver started by hand over a playing video is dismissed the same.
-  readonly property int dismissIdleSeconds: 1
-
-  function syncDismissMonitor() {
-    var wanted = root.screensaverWindowCount > 0 && !dismissSettleTimer.running
-    if (root.screensaverWindowCount === 0) dismissSettleTimer.stop()
-    root.dismissMonitor = armMonitor(root.dismissMonitor, wanted, root.dismissIdleSeconds, "dismiss")
-  }
-
-  function handleDismissIdleChanged() {
-    if (root.dismissIdle || root.screensaverWindowCount === 0) return
-    logEvent("screensaver-stop", "activity (windows=" + root.screensaverWindowCount + ")")
-    runProcess(screensaverStopProcess, "screensaver-stop", root.screensaverStopCommand)
-  }
-
   function handleScreensaverWindowClosed(address) {
     setScreensaverWindow(address, false)
-
-    if (!root.cycleEnabled || !root.idledThisCycle || !root.screensaverStartedThisCycle) return
     if (root.screensaverWindowCount > 0) return
 
-    // The user dismissed the screensaver before the lock deadline. Treat that
-    // as activity and cancel the pending lock; the lock timer is only allowed
-    // to fire while the screensaver remains up.
-    root.cancelIdleCycle("screensaver-dismissed")
+    // Windows this service closes itself are forgotten before they close, so
+    // a tracked window closing is the user's doing (a key press).
+    if (root.away) root.userReturned("screensaver-dismissed")
   }
 
   function eventParts(event, count) {
@@ -327,27 +313,146 @@ Item {
     }
   }
 
-  function handleActiveSignal() {
-    if (!root.idledThisCycle) return
+  // ------------------------------------------------------------------ away
 
-    // Starting the screensaver can make the compositor report activity. Keep
-    // the lock timer running once the screensaver exists (or during its short
-    // launch grace); Hyprland window events cancel the cycle if it exits before
-    // the normal lock deadline.
-    if (root.screensaverStartedThisCycle && (root.screensaverWindowCount > 0 || screensaverLaunchGraceTimer.running)) {
-      logEvent("idle-monitor-active", "screensaver cycle remains armed")
+  // The compositor resets every idle notification on input, and several
+  // things this service does count as input there: the screensaver opening
+  // (focus hops between monitors), the screensaver closing, the lock screen
+  // coming up. Left alone, each stage would push the later ones back by a
+  // full timeout, and standby would even wake the monitors again a moment
+  // after switching them off, because closing the screensaver looked like the
+  // user coming back.
+  //
+  // So the idle monitors only say when the user went away. From then on the
+  // stages run on timers counted from that moment (awaySince), and what the
+  // monitors report next is weighed: activity while an own action is under
+  // way, or just after it, is that action and is ignored.
+  //
+  // The user coming back is seen by a watch monitor with a 1 s timeout, which
+  // ignores idle inhibitors: after any activity, real or not, it goes idle
+  // again a second later and so reports the next input, while the stage
+  // monitors would stay silent until their long timeouts ran out again. It
+  // is armed while the user is away and while a screensaver is up, which is
+  // also what lets a mouse move end the screensaver: omarchy-screensaver
+  // itself only exits on a key press or on losing focus.
+  readonly property int watchIdleSeconds: 1
+  readonly property bool ownActionRunning: screensaverProcess.running || screensaverStopProcess.running
+    || standbyOffProcess.running || lockProcess.running
+  readonly property bool ownActionRecent: ownActionRunning || ownActionTimer.running
+
+  function markOwnAction() {
+    ownActionTimer.restart()
+  }
+
+  onOwnActionRunningChanged: markOwnAction()
+
+  function syncWatchMonitor() {
+    root.watchMonitor = armMonitor(root.watchMonitor, root.away || root.screensaverWindowCount > 0,
+      root.watchIdleSeconds, "watch")
+  }
+
+  function enterAway(since) {
+    root.awaySince = since
+    root.cycleDoneThisAway = false
+    root.standbyFiredThisAway = false
+    root.suspendFiredThisAway = false
+    logEvent("away", "idle since " + new Date(since).toISOString())
+    syncWatchMonitor()
+  }
+
+  // Ends the away state without treating it as the user coming back.
+  function endAway(reason) {
+    if (!root.away) return
+    logEvent("away-end", reason || "requested")
+    root.awaySince = 0
+    root.cycleDoneThisAway = false
+    root.standbyFiredThisAway = false
+    root.suspendFiredThisAway = false
+    standbyAwayTimer.stop()
+    suspendAwayTimer.stop()
+    syncWatchMonitor()
+  }
+
+  // A stage monitor went idle: `seconds` is its timeout, so the user has been
+  // gone that long. Standby and suspend are (re)scheduled from awaySince.
+  function noteIdle(seconds) {
+    if (!root.away) enterAway(Date.now() - seconds * 1000)
+    scheduleAwayStage(standbyAwayTimer, root.standbyArmed && !root.standbyFiredThisAway, root.standbyTimeoutSeconds)
+    scheduleAwayStage(suspendAwayTimer, root.suspendArmed && !root.suspendFiredThisAway, root.suspendTimeoutSeconds)
+  }
+
+  function scheduleAwayStage(timer, wanted, seconds) {
+    if (!root.away || !wanted) {
+      timer.stop()
       return
     }
+    // A stage that is already due fires on the next tick, not from inside
+    // the monitor's signal handler.
+    timer.interval = Math.max(1, root.awaySince + seconds * 1000 - Date.now())
+    timer.restart()
+  }
 
-    cancelIdleCycle("activity")
+  function fireAwayStandby() {
+    if (!root.away || !root.standbyArmed || root.standbyFiredThisAway) return
+    root.standbyFiredThisAway = true
+    standbyDisplays("standby-timeout")
+  }
+
+  function fireAwaySuspend() {
+    if (!root.away || !root.suspendArmed || root.suspendFiredThisAway) return
+    root.suspendFiredThisAway = true
+    suspendSystem("suspend-timeout")
+  }
+
+  function stopScreensaver(reason) {
+    if (root.screensaverWindowCount === 0) return
+    logEvent("screensaver-stop", reason + " (windows=" + root.screensaverWindowCount + ")")
+    resetScreensaverWindows()
+    runProcess(screensaverStopProcess, "screensaver-stop", root.screensaverStopCommand)
+  }
+
+  function userReturned(reason) {
+    logEvent("user-returned", reason)
+    var hadScreensaver = root.screensaverWindowCount > 0
+    if (hadScreensaver) stopScreensaver(reason)
+    cancelIdleCycle(reason)
+    endAway(reason)
+    // Hyprland wakes the monitors on input by itself, but a return seen any
+    // other way would leave them dark.
+    wakeDisplays(reason)
+  }
+
+  // A monitor reported activity: `source` is its stage.
+  function handleActivity(source) {
+    if (root.ownActionRecent) {
+      logEvent("activity-ignored", source + " (own action)")
+      return
+    }
+    if (root.away) {
+      userReturned("activity")
+      return
+    }
+    // Not away: a screensaver started by hand, or monitors switched off from
+    // the panel.
+    if (source === "watch") stopScreensaver("activity")
+    else if (source === "standby") wakeDisplays("activity")
   }
 
   function handleIdleChanged() {
     logEvent("idle-monitor", root.cycleIdle ? "idle" : "active")
+    if (!root.cycleIdle) {
+      handleActivity("cycle")
+      return
+    }
     if (!root.cycleEnabled) return
+    noteIdle(root.firstIdleTimeoutSeconds)
+    // Once the lock has fired there is nothing left for the cycle to do
+    // until the user is back.
+    if (!root.cycleDoneThisAway) startIdleCycle()
+  }
 
-    if (root.cycleIdle) startIdleCycle()
-    else handleActiveSignal()
+  function handleWatchIdleChanged() {
+    if (!root.watchIdle) handleActivity("watch")
   }
 
   // --------------------------------------------------------------- standby
@@ -404,6 +509,7 @@ Item {
     root.standbyActive = true
     root.lastStandbyAt = nowIso()
     logEvent("standby", "displays off (" + (reason || "requested") + ")")
+    markOwnAction()
     var tracked = root.screensaverWindowCount
     screensaverLaunchGraceTimer.stop()
     root.screensaverStartedThisCycle = false
@@ -421,10 +527,10 @@ Item {
   function handleStandbyIdleChanged() {
     logEvent("standby-monitor", root.standbyIdle ? "idle" : "active")
     if (root.standbyIdle) {
-      if (root.standbyArmed) standbyDisplays("standby-timeout")
+      if (root.standbyArmed) noteIdle(root.standbyTimeoutSeconds)
       return
     }
-    wakeDisplays("activity")
+    handleActivity("standby")
   }
 
   // --------------------------------------------------------------- suspend
@@ -449,13 +555,18 @@ Item {
     // held ("Operation denied due to active block inhibitor"); the exit code
     // lands in the log either way.
     endIdleCycle()
+    // Whatever idle time there is after the resume counts from scratch.
+    endAway("suspend")
     runProcess(suspendProcess, "suspend", "omarchy-system-lock; " + root.suspendCommand)
   }
 
   function handleSuspendIdleChanged() {
     logEvent("suspend-monitor", root.suspendIdle ? "idle" : "active")
-    if (!root.suspendIdle || !root.suspendArmed) return
-    suspendSystem("suspend-timeout")
+    if (!root.suspendIdle) {
+      handleActivity("suspend")
+      return
+    }
+    if (root.suspendArmed) noteIdle(root.suspendTimeoutSeconds)
   }
 
   // ------------------------------------------------------------ status/IPC
@@ -497,6 +608,9 @@ Item {
       standbyIdle: root.standbyIdle,
       standbyActive: root.standbyActive,
       suspendIdle: root.suspendIdle,
+      away: root.away,
+      awaySince: root.away ? new Date(root.awaySince).toISOString() : "",
+      ownActionRecent: root.ownActionRecent,
       inIdleCycle: root.idledThisCycle,
       screensaverStarted: root.screensaverStartedThisCycle,
       firstTimeout: root.firstIdleTimeoutSeconds,
@@ -510,7 +624,7 @@ Item {
         standbyTimeout: root.standbyMonitor ? root.standbyMonitor.timeout : null,
         suspend: root.suspendMonitor !== null,
         suspendTimeout: root.suspendMonitor ? root.suspendMonitor.timeout : null,
-        dismiss: root.dismissMonitor !== null
+        watch: root.watchMonitor !== null
       },
       timers: {
         screensaver: screensaverTimer.running,
@@ -641,6 +755,7 @@ Item {
     logEvent("stay-awake", (enabled ? "enabled" : "disabled") + (reason ? " " + reason : ""))
     if (enabled) {
       cancelIdleCycle("stay-awake")
+      endAway("stay-awake")
       wakeDisplays("stay-awake")
     }
     else Qt.callLater(root.handleIdleChanged)
@@ -687,15 +802,15 @@ Item {
     id: monitorComponent
 
     IdleMonitor {
-      // "cycle" (screensaver + lock), "standby", "suspend" or "dismiss" (input
-      // while the screensaver is up); "retired" once replaced so a signal from
-      // a monitor awaiting deletion cannot reach a handler.
+      // "cycle" (screensaver + lock), "standby", "suspend" or "watch" (the
+      // user coming back, see the away section); "retired" once replaced so a
+      // signal from a monitor awaiting deletion cannot reach a handler.
       property string stage: ""
       onIsIdleChanged: {
         if (stage === "cycle") root.handleIdleChanged()
         else if (stage === "standby") root.handleStandbyIdleChanged()
         else if (stage === "suspend") root.handleSuspendIdleChanged()
-        else if (stage === "dismiss") root.handleDismissIdleChanged()
+        else if (stage === "watch") root.handleWatchIdleChanged()
       }
     }
   }
@@ -708,7 +823,7 @@ Item {
       logEvent("monitor-disarm", stage)
     }
     if (!wanted) return null
-    var monitor = monitorComponent.createObject(root, { stage: stage, timeout: timeoutSeconds, respectInhibitors: stage !== "dismiss" })
+    var monitor = monitorComponent.createObject(root, { stage: stage, timeout: timeoutSeconds, respectInhibitors: stage !== "watch" })
     if (!monitor) {
       logEvent("monitor-arm-failed", stage + " timeout=" + timeoutSeconds)
       return null
@@ -719,12 +834,18 @@ Item {
 
   function syncMonitors() {
     var previousCycle = root.cycleMonitor
+    var previousStandby = root.standbyMonitor
+    var previousSuspend = root.suspendMonitor
     root.cycleMonitor = armMonitor(root.cycleMonitor, root.cycleEnabled, root.firstIdleTimeoutSeconds, "cycle")
     root.standbyMonitor = armMonitor(root.standbyMonitor, root.standbyArmed, root.standbyTimeoutSeconds, "standby")
     root.suspendMonitor = armMonitor(root.suspendMonitor, root.suspendArmed, root.suspendTimeoutSeconds, "suspend")
     // A cycle that was started by a monitor that no longer exists has nothing
     // to end it on activity; drop it and let the new monitor start afresh.
     if (root.idledThisCycle && root.cycleMonitor !== previousCycle) cancelIdleCycle("monitor-rearm")
+    // The same goes for the away state: a stage was switched or retimed, so
+    // the count starts over with the new monitors.
+    if (root.cycleMonitor !== previousCycle || root.standbyMonitor !== previousStandby
+      || root.suspendMonitor !== previousSuspend) endAway("monitor-rearm")
   }
 
   onCycleEnabledChanged: syncMonitors()
@@ -764,11 +885,30 @@ Item {
     }
   }
 
+  // How long after an own action reported activity is still taken to be that
+  // action. When it runs out while the user is away, the watch monitor must
+  // be idle again; if it is not, there was input in the meantime that had
+  // been ignored, and the user is back.
   Timer {
-    id: dismissSettleTimer
-    interval: 1500
+    id: ownActionTimer
+    interval: 2500
     repeat: false
-    onRunningChanged: root.syncDismissMonitor()
+    onTriggered: {
+      if (root.ownActionRunning) restart()
+      else if (root.away && root.watchMonitor && !root.watchIdle) root.userReturned("activity during own action")
+    }
+  }
+
+  Timer {
+    id: standbyAwayTimer
+    repeat: false
+    onTriggered: root.fireAwayStandby()
+  }
+
+  Timer {
+    id: suspendAwayTimer
+    repeat: false
+    onTriggered: root.fireAwaySuspend()
   }
 
   Connections {
