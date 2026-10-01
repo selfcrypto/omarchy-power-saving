@@ -26,13 +26,14 @@ Panel {
   readonly property bool powerSaving: ready && !svc.stayAwake && !svc.stockIdleEnabled
 
   // `number` is the key that toggles the stage; it runs across both groups.
+  // `nowKey` runs it at once, as a click on the row's name does.
   readonly property var displayStages: [
-    { key: "screensaver", glyph: "󱄄", number: 1, hint: "Terminal screensaver; also `omarchy toggle screensaver`" },
-    { key: "standby", glyph: "󰶐", number: 2, hint: "Monitors off (DPMS); a key or the mouse brings them back" }
+    { key: "screensaver", glyph: "󱄄", number: 1, nowKey: "r", hint: "Terminal screensaver; also `omarchy toggle screensaver`" },
+    { key: "standby", glyph: "󰶐", number: 2, nowKey: "o", hint: "Monitors off (DPMS); a key or the mouse brings them back" }
   ]
   readonly property var systemStages: [
-    { key: "lock", glyph: "󰌾", number: 3, hint: "Lock screen; the backlight drops 5 s later" },
-    { key: "suspend", glyph: "󰒲", number: 4, hint: "Suspend through logind; the session locks first" }
+    { key: "lock", glyph: "󰌾", number: 3, nowKey: "k", hint: "Lock screen; the backlight drops 5 s later" },
+    { key: "suspend", glyph: "󰒲", number: 4, nowKey: "s", hint: "Suspend through logind; the session locks first" }
   ]
   readonly property var stages: displayStages.concat(systemStages)
 
@@ -47,6 +48,12 @@ Panel {
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
   function standbyNow() { if (!ready) return; root.close(); svc.standbyDisplays("panel") }
+  function runStageNow(key) {
+    if (key === "screensaver") screensaverNow()
+    else if (key === "standby") standbyNow()
+    else if (key === "lock") lockNow()
+    else if (key === "suspend") suspendNow()
+  }
 
   readonly property var stageList: {
     var list = []
@@ -70,19 +77,20 @@ Panel {
   implicitHeight: button.implicitHeight
 
   onOpenedChanged: {
-    keyCatcher.standbyPending = false
+    keyCatcher.pendingKey = ""
     if (opened) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
   // One stage row: glyph, name, what it does and when, minutes, switch. Both
-  // groups use it, so the two sections cannot drift apart.
+  // groups use it, so the two sections cannot drift apart. The glyph-and-name
+  // part is a button that runs the stage at once.
   component StageRow: Rectangle {
     id: row
     required property var modelData
     readonly property string key: modelData.key
     readonly property bool isOn: root.stageEnabled(key)
     readonly property int minutes: root.stageMinutes(key)
-    readonly property bool hovered: rowMouse.containsMouse || minutesField.hovering || stageSwitch.containsMouse
+    readonly property bool hovered: rowMouse.containsMouse || runMouse.containsMouse || minutesField.hovering || stageSwitch.containsMouse
     width: parent ? parent.width : 0
     height: Style.space(50)
     radius: Style.cornerRadius
@@ -96,7 +104,26 @@ Panel {
       acceptedButtons: Qt.NoButton
     }
 
+    MouseArea {
+      id: runMouse
+      anchors.left: parent.left
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      width: rowLayout.x + minutesField.x - rowLayout.spacing / 2
+      hoverEnabled: true
+      enabled: root.ready
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.runStageNow(row.key)
+
+      PanelToolTip {
+        visible: runMouse.containsMouse
+        text: IdleModel.stageLabel(row.key) + " now (" + row.modelData.nowKey + ")"
+        fontFamily: root.fontFamily
+      }
+    }
+
     RowLayout {
+      id: rowLayout
       anchors.fill: parent
       anchors.leftMargin: Style.space(8)
       anchors.rightMargin: Style.space(10)
@@ -304,62 +331,13 @@ Panel {
 
         PanelSeparator { width: parent.width }
 
-        RowLayout {
-          width: parent.width
-          spacing: Style.space(8)
-
-          Text {
-            Layout.fillWidth: true
-            text: "Right now"
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          PanelActionButton {
-            iconText: "󱄄"
-            tooltipText: "Screensaver now (r)"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            enabled: root.ready
-            onClicked: root.screensaverNow()
-          }
-
-          PanelActionButton {
-            iconText: "󰶐"
-            tooltipText: "Monitors off now (o)"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            enabled: root.ready
-            onClicked: root.standbyNow()
-          }
-
-          PanelActionButton {
-            iconText: "󰌾"
-            tooltipText: "Lock now (k)"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            enabled: root.ready
-            onClicked: root.lockNow()
-          }
-
-          PanelActionButton {
-            iconText: "󰒲"
-            tooltipText: "Suspend now (s)"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-            enabled: root.ready
-            onClicked: root.suspendNow()
-          }
-        }
-
         // Three lines by hand: one string wraps mid-shortcut at this width.
         Column {
           width: parent.width
           spacing: Style.space(2)
 
           Repeater {
-            model: ["t stay awake · 1-4 stage on/off", "run now: r screensaver · o standby", "k lock · s suspend"]
+            model: ["t stay awake · 1-4 stage on/off", "run now: click a stage, or r screensaver", "o standby · k lock · s suspend"]
             delegate: Text {
               required property string modelData
               width: parent.width

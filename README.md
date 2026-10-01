@@ -90,6 +90,7 @@ omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable
 - In the panel, each stage row has a minutes field and a switch. Keys:
   `t` stay awake, `1`–`4` toggle a stage, `r` screensaver now, `o` standby now,
   `k` lock now, `s` suspend now.
+- Clicking a stage's icon or name runs that stage at once, as its key does.
 
 The screensaver ends on a mouse move as well as on a key press. Omarchy's own
 only reacts to keys, so this service watches for input while one is up and
