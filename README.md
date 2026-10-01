@@ -105,8 +105,9 @@ Running a stage by hand works even when its switch is off.
 Screensaver:
 
 - A mouse move ends it, as well as a key press. The stock screensaver only
-  reacts to keys. Mouse dismissal starts working about 2.5 seconds after the
-  screensaver appears.
+  reacts to keys. Movement in the first 1.5 seconds after it appears is
+  ignored, so a hand still on the mouse does not end it at once. After that
+  any movement ends it immediately, including movement that never stopped.
 - Ending the screensaver counts as activity, so a pending lock is cancelled
   and the idle count starts again.
 - The switch is Omarchy's own `screensaver-off` toggle, so the Omarchy menu
@@ -221,11 +222,14 @@ Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock` and
   idle monitor when the screensaver opens or closes and when the lock screen
   comes up, so monitors alone would delay the later stages.
 - Activity reported while the service starts or closes the screensaver,
-  locks or turns the monitors off, and for 2.5 seconds after, is taken to be
+  locks or turns the monitors off, and for 1.5 seconds after, is taken to be
   that action and is ignored.
-- Your return is detected by a fourth idle monitor with a 1 second timeout
+- Your return is detected by a fourth idle monitor with a 0.1 second timeout
   that ignores idle inhibitors. It is armed while you are away and while a
   screensaver is up. This is also what ends the screensaver on a mouse move.
+- That monitor only reports the step from idle to active. For input that
+  never paused, the service looks at it when the 1.5 seconds are over: if it
+  is not idle then, there is input at that moment.
 - Standby calls
   `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`. The older
   `hyprctl dispatch dpms off` no longer parses on Hyprland 0.56. The action

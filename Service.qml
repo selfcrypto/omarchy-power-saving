@@ -328,14 +328,14 @@ Item {
   // monitors report next is weighed: activity while an own action is under
   // way, or just after it, is that action and is ignored.
   //
-  // The user coming back is seen by a watch monitor with a 1 s timeout, which
+  // The user coming back is seen by a watch monitor with a 0.1 s timeout, which
   // ignores idle inhibitors: after any activity, real or not, it goes idle
-  // again a second later and so reports the next input, while the stage
+  // again a moment later and so reports the next input, while the stage
   // monitors would stay silent until their long timeouts ran out again. It
   // is armed while the user is away and while a screensaver is up, which is
   // also what lets a mouse move end the screensaver: omarchy-screensaver
   // itself only exits on a key press or on losing focus.
-  readonly property int watchIdleSeconds: 1
+  readonly property real watchIdleSeconds: 0.1
   readonly property bool ownActionRunning: screensaverProcess.running || screensaverStopProcess.running
     || standbyOffProcess.running || lockProcess.running
   readonly property bool ownActionRecent: ownActionRunning || ownActionTimer.running
@@ -420,6 +420,11 @@ Item {
     // Hyprland wakes the monitors on input by itself, but a return seen any
     // other way would leave them dark.
     wakeDisplays(reason)
+  }
+
+  function handleInput(reason) {
+    if (root.away) userReturned(reason)
+    else stopScreensaver(reason)
   }
 
   // A monitor reported activity: `source` is its stage.
@@ -886,16 +891,18 @@ Item {
   }
 
   // How long after an own action reported activity is still taken to be that
-  // action. When it runs out while the user is away, the watch monitor must
-  // be idle again; if it is not, there was input in the meantime that had
-  // been ignored, and the user is back.
+  // action. The watch monitor only reports the step from idle to active, so
+  // input that began meanwhile and has not paused would go unseen: a mouse
+  // kept moving while the screensaver came up would never end it. So when
+  // the time runs out and the watch monitor is not idle, there is input
+  // right now (within its 0.1 s), and it is acted on.
   Timer {
     id: ownActionTimer
-    interval: 2500
+    interval: 1500
     repeat: false
     onTriggered: {
       if (root.ownActionRunning) restart()
-      else if (root.away && root.watchMonitor && !root.watchIdle) root.userReturned("activity during own action")
+      else if ((root.away || root.screensaverWindowCount > 0) && root.watchMonitor && !root.watchIdle) root.handleInput("activity")
     }
   }
 
