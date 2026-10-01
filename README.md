@@ -1,17 +1,24 @@
 # Omarchy Power Saving
 
-Idle power saving for [Omarchy](https://omarchy.org) in four independent
-stages, grouped the way you think about them:
+Idle power saving for [Omarchy](https://omarchy.org) in four stages:
 
-- **Display** — **screensaver**, then **standby** (monitors off).
-- **System** — **lock**, then **suspend**.
+| Group | Stage | What it does |
+|---|---|---|
+| Display | Screensaver | Starts the Omarchy terminal screensaver |
+| Display | Standby | Turns the monitors off (DPMS) |
+| System | Lock | Locks the session |
+| System | Suspend | Suspends the machine |
 
-Each stage has its own on/off switch and its own idle timeout, set from a bar
-panel.
+Each stage has its own switch and its own idle timeout. Both are set from a
+panel in the bar.
 
-Omarchy's stock idle service only knows screensaver + lock, cannot switch
-either off individually, never puts the monitors into standby and never
-suspends. This plugin replaces it.
+The stock Omarchy idle service only has screensaver and lock. It cannot switch
+either of them off, it never turns the monitors off and it never suspends.
+This plugin replaces it.
+
+## Preview
+
+![Power Saving panel with the display and system stages](preview.png)
 
 ## Install
 
@@ -19,17 +26,18 @@ suspends. This plugin replaces it.
 omarchy plugin add https://github.com/selfcrypto/omarchy-power-saving.git --enable
 ```
 
-That is the whole installation. The plugin is declared a clone of the stock
-`omarchy.idle` service (the one it replaces — leaving both on would lock and
-launch the screensaver twice), so enabling it switches the stock service off
-and removing it switches the stock service back on; Omarchy handles both.
-Your existing `idle.screensaver` / `idle.lock` values in `shell.json` are
-picked up as the starting point.
+Nothing else is needed. The plugin is declared as a clone of the stock
+`omarchy.idle` service, so Omarchy switches the stock service off when this
+plugin is enabled and back on when it is removed. Running both would lock and
+start the screensaver twice.
 
-Re-enabling `omarchy.idle` by hand later takes this plugin out of the bar
-again, the same way Omarchy treats any other clone.
+The `idle.screensaver` and `idle.lock` values you already have in `shell.json`
+are used as the starting timeouts.
 
-Verify:
+If you enable `omarchy.idle` again by hand, Omarchy takes this plugin out of
+the bar, as it does with any other clone.
+
+Check that it is running:
 
 ```bash
 omarchy plugin list
@@ -40,80 +48,100 @@ Update:
 
 ```bash
 omarchy plugin update io.github.selfcrypto.power-saving
+omarchy restart shell
 ```
 
-Remove (the stock service comes back on its own; the second command only
-matters for an install that predates 1.3.0):
+Remove:
 
 ```bash
-omarchy plugin remove io.github.selfcrypto.power-saving && omarchy plugin enable omarchy.idle
+omarchy plugin remove io.github.selfcrypto.power-saving
 ```
 
-## Who it's for
+The stock service comes back by itself. If the plugin was installed before
+1.3.0, also run `omarchy plugin enable omarchy.idle`.
 
-- **Desktop PCs** first of all. A desktop has no lid switch, and stock Omarchy
-  has neither an idle-standby nor an idle-suspend stage, so the monitors stay
-  lit and the machine never suspends. This plugin gives it both.
-- **Laptops left open.** Closing the lid already suspends (that's logind, not
-  this plugin), but a laptop sitting open on a desk never blanks its panel or
-  suspends on idle in stock Omarchy either — and there it costs battery. The
-  per-stage switches ("screensaver but no lock at home") are useful on any
-  machine.
-- Not yet: separate timeouts for battery and mains. One set of timeouts
-  applies whatever the power source.
+## Who it is for
 
-## Preview
+- Desktop PCs. A desktop has no lid, and stock Omarchy has no idle standby and
+  no idle suspend, so the monitors stay on and the machine never suspends.
+- Laptops left open. Closing the lid suspends (logind does that, this plugin
+  is not involved), but an open laptop never turns its screen off or suspends
+  on idle in stock Omarchy.
+- Anyone who wants to switch single stages off, for example screensaver
+  without lock at home.
 
-![Power Saving panel: display and system stages with minutes and switches](preview.png)
-
-## Features
-
-- Four stages — screensaver, standby, lock, suspend — each with a switch and a
-  timeout in minutes of idle.
-- **Monitor standby that Omarchy does not otherwise have.** The lock screen's
-  "blank" is `omarchy-brightness-display off`, which is backlight/DDC
-  brightness on one monitor, not standby; this stage drives Hyprland's DPMS
-  dispatcher, so the monitors actually power down.
-- Standby and suspend have an idle monitor each: both respect idle inhibitors (a
-  playing video keeps the screens on) and both survive the lock.
-- "Stay awake" pauses all four stages; it is the same flag as
-  `omarchy toggle idle` and the coffee-cup indicator.
-- The screensaver switch is Omarchy's own `screensaver-off` toggle, so the
-  Omarchy menu and the panel always agree.
-- Numpad-safe minutes fields and one settings write per edit.
-- Full IPC control.
+There is one set of timeouts. Separate timeouts for battery and mains are not
+supported yet.
 
 ## Usage
 
-- **Left-click** the bar icon: open the panel.
-- **Right-click**: toggle *stay awake*.
-- In the panel, each stage row has a minutes field and a switch. Keys:
-  `t` stay awake, `1`–`4` toggle a stage, `r` screensaver now, `o` standby now,
-  `k` lock now, `s` suspend now.
-- Clicking a stage's icon or name runs that stage at once, as its key does.
+Bar icon:
 
-The screensaver ends on a mouse move as well as on a key press. Omarchy's own
-only reacts to keys, so this service watches for input while one is up and
-closes it — whether an idle timeout started it or you did.
+- Left click opens the panel.
+- Right click toggles stay awake, which pauses all four stages. It is the same
+  flag as `omarchy toggle idle` and the coffee cup indicator.
 
-Monitors come back on a key press or a mouse move (Omarchy ships
-`misc.key_press_enables_dpms` and `misc.mouse_move_enables_dpms` on), and this
-service switches them back on explicitly when it sees activity, when standby is
-switched off with the screens already dark, and before suspending — a resume
-never lands on a black desktop. Standby ends a running screensaver and none
-starts while the monitors are dark (see the notes below for why); the lock
-stage keeps its own timer either way.
+Panel:
 
-Suspend always locks first, through the same `omarchy-system-lock` the lock
-stage uses, so a running screensaver is closed before the machine suspends and
-it wakes to the lock screen, not to a screensaver behind the unlocked desktop.
-(Omarchy's own `omarchy-sleep-lock.service` locks on `PrepareForSleep` as well,
-whatever the lock stage says.)
+- Each stage row has a minutes field and a switch.
+- Clicking the icon or the name of a stage runs that stage immediately.
+- The switch at the top toggles stay awake.
+
+Keys in the panel:
+
+| Key | Action |
+|---|---|
+| `t` | Toggle stay awake |
+| `1` to `4` | Switch a stage on or off |
+| `r` | Screensaver now |
+| `o` | Standby now |
+| `k` | Lock now |
+| `s` | Suspend now |
+
+Running a stage by hand works even when its switch is off.
+
+## Behaviour
+
+Screensaver:
+
+- A mouse move ends it, as well as a key press. The stock screensaver only
+  reacts to keys. Mouse dismissal starts working about 2.5 seconds after the
+  screensaver appears.
+- Ending the screensaver counts as activity, so a pending lock is cancelled
+  and the idle count starts again.
+- The switch is Omarchy's own `screensaver-off` toggle, so the Omarchy menu
+  and the panel always show the same state.
+- It is not started while the monitors are off.
+
+Standby:
+
+- The monitors are turned off through Hyprland's DPMS dispatcher. The lock
+  screen "blank" in stock Omarchy only lowers the brightness of one monitor.
+- A key press or a mouse move turns them back on.
+- A running screensaver is closed first. This does not count as activity, so
+  the lock still fires on time.
+- Idle inhibitors are respected. A playing video keeps the monitors on.
+
+Lock:
+
+- Uses `omarchy-system-lock`, the same as the stock service.
+
+Suspend:
+
+- Locks the session first, so the machine wakes to the lock screen.
+- Turns the monitors back on before suspending, so a resume does not show a
+  black screen.
+- Goes through logind, needs no privileges and is refused while a sleep
+  inhibitor is held.
+- Idle inhibitors are respected.
+
+Standby and suspend keep counting after the session is locked.
 
 ## Configuration
 
-Everything is stored inline on this plugin's entry in the bar layout of
-`~/.config/omarchy/shell.json`, written by the panel or by `omarchy bar set`:
+The settings are stored on this plugin's entry in the bar layout of
+`~/.config/omarchy/shell.json`. The panel writes them, and so does
+`omarchy bar set`:
 
 ```bash
 omarchy bar set io.github.selfcrypto.power-saving suspend 1800
@@ -133,22 +161,26 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
 }
 ```
 
-A key missing from the entry falls back to the stock `idle` block of
-`shell.json`, so the timeouts you had before still apply, and the first edit
-from the panel copies the whole set onto the entry. (Since Omarchy 4.0.3 a
-third-party plugin may write its own bar entry and nothing else, which is why
-the `idle` block is read but no longer written.)
-
 | Key | Meaning | Default |
 |---|---|---|
-| `screensaver`, `standby`, `lock`, `suspend` | seconds of idle before the stage fires | 150, 600, 300, 1800 |
-| `lockEnabled` | lock stage on/off | `true` |
-| `standbyEnabled` | standby stage on/off | `false` |
-| `suspendEnabled` | suspend stage on/off | `false` |
+| `screensaver` | Seconds of idle before the screensaver starts | 150 |
+| `standby` | Seconds of idle before the monitors turn off | 600 |
+| `lock` | Seconds of idle before the session locks | 300 |
+| `suspend` | Seconds of idle before the machine suspends | 1800 |
+| `standbyEnabled` | Standby stage on or off | `false` |
+| `lockEnabled` | Lock stage on or off | `true` |
+| `suspendEnabled` | Suspend stage on or off | `false` |
 
-The suspend stage uses the stock `suspend` key, so nothing else in Omarchy has
-to learn a new name. The screensaver switch is the flag file
-`~/.local/state/omarchy/toggles/screensaver-off` (`omarchy toggle screensaver`).
+The minimum timeout is 10 seconds.
+
+A key that is missing from the entry is read from the stock `idle` block of
+`shell.json`. The first edit from the panel copies all keys onto the entry.
+The `idle` block is only read, never written, because since Omarchy 4.0.3 a
+third-party plugin can only write its own bar entry.
+
+The screensaver switch is not in `shell.json`. It is the flag file
+`~/.local/state/omarchy/toggles/screensaver-off`, which
+`omarchy toggle screensaver` also writes.
 
 ## IPC
 
@@ -158,59 +190,57 @@ keep working.
 ```bash
 omarchy-shell idle status                       # JSON: stages, monitors, last event
 omarchy-shell idle stage standby on             # on | off | toggle | status
-omarchy-shell idle timeout standby 900          # seconds (min 10)
+omarchy-shell idle timeout standby 900          # set, in seconds
 omarchy-shell idle timeout standby ""           # print the current value
-omarchy-shell idle standby                      # standby (monitors off) now
+omarchy-shell idle screensaver                  # screensaver now
+omarchy-shell idle standby                      # monitors off now
 omarchy-shell idle wake                         # monitors on now
-omarchy-shell idle screensaver                  # screensaver now, even with the stage off
 omarchy-shell idle suspend                      # suspend now
-omarchy-shell idle enable | disable | toggle    # stay-awake, as upstream
+omarchy-shell idle enable | disable | toggle    # stay awake, as in the stock service
 ```
 
-Stage names for `stage` and `timeout`: `screensaver`, `standby`, `lock`,
+Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock` and
 `suspend`.
 
-## Requirements and dependencies
+## Requirements
 
-- Omarchy 4.0.3 or later (the release that scopes what a plugin may read and
-  write; 1.3.0 is built for that API); no extra packages.
-- Hyprland ≥ 0.56 for the standby stage: it drives DPMS through the Lua
-  dispatcher, `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`
-  (the older `hyprctl dispatch dpms off` no longer parses there).
-- Suspend asks logind directly (the `org.freedesktop.login1` `Suspend` call,
-  the same one Omarchy's own Suspend menu entry makes), so it needs no
-  privileges and is refused while a sleep inhibitor is held.
-- No external services. No privileges beyond the user session.
+- Omarchy 4.0.3 or later.
+- Hyprland 0.56 or later for the standby stage.
+- No extra packages, no external services and no privileges beyond the user
+  session.
 
-## Notes
+## Technical notes
 
-- Monitors are never reconfigured, only created and destroyed: Quickshell
-  0.3.1 silently breaks an `IdleMonitor` whose timeout changes at runtime.
-- Screensaver and lock share one idle monitor, as the stock service does;
-  standby and suspend have one each, so they still fire after the lock.
-- The DPMS action has to be passed as `{action = "off"}`. `hl.dsp.dpms("off")`
-  builds a perfectly valid dispatcher, and every other shape tried does too —
-  but the argument is then ignored and the dispatch *toggles*, which turns a
-  wake into a blank. `hyprctl monitors` is no help in spotting it either: its
-  `dpmsStatus` lags a dispatch behind. `/sys/class/drm/*/dpms` is the honest
-  read.
-- Standby closes a running screensaver and no screensaver starts while the
-  monitors are off. A DisplayPort monitor in DPMS off can drop its link and be
-  reported unplugged; Hyprland then removes it from the layout, and a
-  screensaver window that lives through that comes back on the monitor with
-  a stale input box: painted over everything, clicks falling through to the
-  desktop behind it. Closing it this way is not a dismissal, so a pending
-  lock still fires on time; and it happens before the DPMS off, because the
-  screensaver's exit restores the cursor through a config keyword, which has
-  Hyprland switch the monitors back on.
-- The stock coffee-cup indicator in `omarchy.indicators` follows this plugin
-  (Omarchy resolves the stock id to the enabled clone), so it and this
-  widget's right-click toggle the same stay-awake flag.
-- The service reads `shell.json` itself instead of the `barConfig` snapshot
-  the host hands plugins: in 4.0.3 that snapshot is refreshed one config
-  event late, so a panel edit would only show up after the next unrelated
-  write.
+- Idle monitors are created and destroyed, never reconfigured. Quickshell
+  0.3.1 breaks an `IdleMonitor` whose timeout changes at runtime.
+- Screensaver and lock share one idle monitor, as in the stock service.
+  Standby and suspend have one each.
+- Mouse dismissal uses a fourth idle monitor with a 1 second timeout. It is
+  armed 1.5 seconds after the last screensaver window opens, and it ignores
+  idle inhibitors. Once it has reported idle, the next input closes the
+  screensaver.
+- Standby calls
+  `hyprctl eval 'hl.dispatch(hl.dsp.dpms({action = "off"}))'`. The older
+  `hyprctl dispatch dpms off` no longer parses on Hyprland 0.56. The action
+  has to be passed as `{action = "off"}`. With `hl.dsp.dpms("off")` the
+  argument is ignored and the dispatch toggles.
+- `hyprctl monitors` reports `dpmsStatus` one dispatch late. The service reads
+  `/sys/class/drm/*/dpms` instead.
+- The screensaver is kept off dark monitors because a DisplayPort monitor in
+  DPMS off can drop its link. Hyprland then removes the monitor, and a
+  screensaver window that survives this comes back drawn over the whole
+  monitor while clicks go through to the desktop.
+- The screensaver is closed before the DPMS off. Its exit restores the cursor
+  through a Hyprland config keyword, and that makes Hyprland turn the
+  monitors back on.
+- Omarchy's `omarchy-sleep-lock.service` also locks on suspend, whatever the
+  lock stage is set to.
+- The stock coffee cup indicator in `omarchy.indicators` follows this plugin,
+  because Omarchy resolves the stock id to the enabled clone.
+- The service reads `shell.json` itself and does not use the `barConfig`
+  snapshot the host passes to plugins. In 4.0.3 that snapshot is refreshed
+  one config event late.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
