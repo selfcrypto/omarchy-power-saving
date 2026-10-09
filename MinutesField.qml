@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as QQC
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 // Minutes spin box for the stage rows: Omarchy's NumberField look, plus two
@@ -20,8 +21,8 @@ QQC.SpinBox {
   id: root
 
   property int shownValue: 0
-  property color foreground: Color.foreground
-  property color accent: Color.accent
+  property color foreground: Commons.Color.foreground
+  property color accent: Commons.Color.accent
   property string fontFamily: Style.font.family
   property int commitDelayMs: 400
   readonly property bool hovering: hover.hovered
