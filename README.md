@@ -83,7 +83,8 @@ Bar icon:
 
 Panel:
 
-- Each stage row has a minutes field and a switch.
+- Each stage row has a minutes field and a switch. Click the field and type
+  the minutes; Enter applies them, the arrows and Up/Down step.
 - Clicking the icon or the name of a stage runs that stage immediately.
 - The switch at the top toggles stay awake.
 
@@ -97,6 +98,18 @@ Keys in the panel:
 | `o` | Standby now |
 | `k` | Lock now |
 | `s` | Suspend now |
+
+Keys in a minutes field, once it has been clicked:
+
+| Key | Action |
+|---|---|
+| `0` to `9` | Type the minutes (1 to 1440) |
+| `Backspace` | Delete the last digit typed |
+| `Enter` | Apply what was typed |
+| `Escape` | Drop what was typed; with nothing typed, close the panel |
+| `Up`, `Down` | Step by one minute |
+
+Letters still act as panel keys while the field has focus.
 
 Running a stage by hand works even when its switch is off.
 
