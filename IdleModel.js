@@ -133,18 +133,6 @@ function summaryText(stages) {
   return parts.join(" → ")
 }
 
-// Same order, but "󱄄 10 min → 󰌾 20 min → 󰒲 30 min": short enough for the
-// hero's letter-spaced caps line, where the words would be cut off.
-function compactSummaryText(stages) {
-  var on = []
-  for (var i = 0; i < stages.length; i++) if (stages[i].enabled) on.push(stages[i])
-  if (on.length === 0) return "All stages off"
-  on.sort(function(a, b) { return a.seconds - b.seconds })
-  var parts = []
-  for (var j = 0; j < on.length; j++) parts.push(on[j].glyph + " " + durationText(on[j].seconds))
-  return parts.join(" → ")
-}
-
 // ---------------------------------------------------------------- config
 
 function isObject(value) {
@@ -206,10 +194,12 @@ if (typeof module !== "undefined") {
     STAGE_LABELS: STAGE_LABELS,
     isStage: isStage,
     stageLabel: stageLabel,
+    GROUP_ORDER: GROUP_ORDER,
+    timeoutBounds: timeoutBounds,
+    clampToBounds: clampToBounds,
     firstTimeout: firstTimeout,
     durationText: durationText,
     summaryText: summaryText,
-    compactSummaryText: compactSummaryText,
     isObject: isObject,
     STAGE_KEYS: STAGE_KEYS,
     barEntrySettings: barEntrySettings,
