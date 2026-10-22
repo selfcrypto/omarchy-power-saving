@@ -9,9 +9,10 @@ import "IdleModel.js" as IdleModel
 // Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 // that draws the four idle stages in the order they fire (IdleSchedule.qml),
 // then lists them in their two groups, display (screensaver, standby) and
-// system (lock, suspend), each with a switch and a minutes stepper. All state lives in Service.qml, which the shell loads once;
-// this widget exists once per monitor and only reads from and calls into that
-// service, so the copies never disagree.
+// system (lock, suspend), each with a switch and a minutes stepper. All state
+// lives in Service.qml, which the shell loads once; this widget exists once
+// per monitor and only reads from and calls into that service, so the copies
+// never disagree.
 //
 // Left-click opens the panel, right-click toggles stay-awake. NOTE: after
 // editing this file run `omarchy restart shell`. The hot reload
@@ -42,7 +43,7 @@ Panel {
   function stageSeconds(key) { return ready ? svc.stageTimeout(key) : 0 }
   function stageMinutes(key) { return Math.max(1, Math.round(stageSeconds(key) / 60)) }
   function setStageEnabled(key, value) { if (ready) svc.setStageEnabled(key, value) }
-  function setStageMinutes(key, minutes) { if (ready) svc.setStageTimeout(key, Math.max(1, minutes) * 60) }
+  function setStageMinutes(key, minutes) { return ready && svc.setStageTimeout(key, Math.max(1, minutes) * 60) }
   function toggleStage(key) { setStageEnabled(key, !stageEnabled(key)) }
   function togglePowerSaving() { if (ready) svc.setIdleEnabled(root.stayAwake) }
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
@@ -79,12 +80,16 @@ Panel {
     return ""
   }
 
-  // Minutes a stage's field may take: its group neighbour's time while both are on.
+  // Minutes a stage's field may take: its group neighbour's time while both are
+  // on. The value it shows now is always inside, so a time that is not a whole
+  // minute, or out of order by hand, is shown as it is and not clamped.
   function minutesRange(key) {
     if (!ready) return { from: 1, to: 1440 }
     var b = svc.stageTimeoutBounds(key)
-    var from = Math.max(1, Math.ceil(b.min / 60))
-    return { from: from, to: b.max >= 0 ? Math.max(from, Math.floor(b.max / 60)) : 1440 }
+    var shown = stageMinutes(key)
+    var from = Math.min(shown, Math.max(1, Math.ceil(b.min / 60)))
+    var to = b.max >= 0 ? Math.max(shown, Math.floor(b.max / 60)) : 1440
+    return { from: from, to: Math.max(from, to) }
   }
 
   readonly property color foreground: Commons.Color.popups.text
@@ -212,7 +217,8 @@ Panel {
         fontFamily: root.fontFamily
         enabled: root.ready
         Accessible.name: IdleModel.stageLabel(row.key) + " idle minutes"
-        onCommitted: function(v) { root.setStageMinutes(row.key, v) }
+        // A refused write (out of order by the time it lands) puts the saved value back.
+        onCommitted: function(v) { if (!root.setStageMinutes(row.key, v)) minutesField.value = row.minutes }
       }
 
       ToggleSwitch {

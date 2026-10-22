@@ -42,6 +42,13 @@ test("clampToBounds moves a time into range", () => {
   assert.strictEqual(M.clampToBounds(500, { min: 10, max: 1200 }), 500)
 })
 
+test("the minimum wins over a neighbour's time set below it by hand", () => {
+  const s = states([false, 300], [true, 5], [true, 900], [false, 1200])
+  const b = M.timeoutBounds("screensaver", Object.assign({}, s, { screensaver: { enabled: true, seconds: 300 } }), 10)
+  assert.deepStrictEqual(b, { min: 10, max: 5 })
+  assert.strictEqual(M.clampToBounds(300, b), 10)
+})
+
 test("summaryText lists stages that are on, in firing order", () => {
   const list = [{ key: "lock", enabled: true, seconds: 600 }, { key: "standby", enabled: false, seconds: 60 },
     { key: "screensaver", enabled: true, seconds: 120 }]

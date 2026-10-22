@@ -5,7 +5,7 @@ One section per file: its first doc line, then each top-level symbol with its li
 
 <!-- repo-docs v3 roots=. 2026-10-22 -->
 
-## IdleModel.js (209 lines)
+## IdleModel.js (210 lines)
 Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - function secondsFromConfig L4
 - function boolFromConfig L10
@@ -17,32 +17,32 @@ Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - function stageLabel L72
 - const GROUP_ORDER L79: are allowed. Only stages that are on are held to it.
 - function timeoutBounds L83: { key: { enabled, seconds } }: { min, max }, max -1 when there is no limit.
-- function clampToBounds L98: `seconds` moved into `bounds`.
-- function firstTimeout L107: disabled then, so the value never fires).
-- function durationText L114
-- function summaryText L126: firing order; "All stages off" when nothing is armed.
-- function isObject L138
-- const STAGE_KEYS L142
-- function barEntrySettings L146: without the id; {} when the entry is absent, so reads fall back.
-- function mergedStageConfig L165: A key missing from both stays missing so Service.qml's defaults apply.
-- function stageSettingsFor L177: key currently in effect, so the first write migrates the idle block.
+- function clampToBounds L99: written by hand below it.
+- function firstTimeout L108: disabled then, so the value never fires).
+- function durationText L115
+- function summaryText L127: firing order; "All stages off" when nothing is armed.
+- function isObject L139
+- const STAGE_KEYS L143
+- function barEntrySettings L147: without the id; {} when the entry is absent, so reads fall back.
+- function mergedStageConfig L166: A key missing from both stays missing so Service.qml's defaults apply.
+- function stageSettingsFor L178: key currently in effect, so the first write migrates the idle block.
 
-## IdleSchedule.qml (174 lines)
+## IdleSchedule.qml (172 lines)
 The stages in the order they fire: one stop per stage, sorted by timeout,
-- property stages L17: [{ key, glyph, number, enabled, seconds }] in any order.
-- property status L19: One line above the stops; empty hides it.
-- property available L20
-- property foreground L21
-- property accent L22
-- property fontFamily L23
-- property secondary L24
-- property faint L25
-- signal stageClicked L27
-- property ordered L30: By timeout; equal times keep the panel's order.
-- property firstOn L36
-- property lastOn L40
-- property cell L44
-- property dot L45
+- property stages L16: [{ key, glyph, number, enabled, seconds }] in any order.
+- property status L18: One line above the stops; empty hides it.
+- property available L19
+- property foreground L20
+- property accent L21
+- property fontFamily L22
+- property secondary L23
+- property faint L24
+- signal stageClicked L26
+- property ordered L29: By timeout; equal times keep the panel's order.
+- property firstOn L35
+- property lastOn L39
+- property cell L43
+- property dot L44
 
 ## MinutesField.qml (212 lines)
 Minutes spin box for the stage rows: Omarchy's NumberField look, without
@@ -62,43 +62,43 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (440 lines)
+## Panel.qml (446 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
-- property svc L24
-- property ready L25
-- property stayAwake L26
-- property powerSaving L27
-- property displayStages L31: `nowKey` runs it at once, as a click on the row's name does.
-- property systemStages L35
-- property stages L39
-- function stageEnabled L41
-- function stageSeconds L42
-- function stageMinutes L43
-- function setStageEnabled L44
-- function setStageMinutes L45
-- function toggleStage L46
-- function togglePowerSaving L47
-- function lockNow L48
-- function suspendNow L49
-- function screensaverNow L50
-- function standbyNow L51
-- function runStageNow L52
-- property stageList L59
-- property summary L67
-- property stagesOn L69
-- property scheduleStatus L71: Above the schedule; empty while it runs normally, since the dots say it all.
-- function minutesRange L83: Minutes a stage's field may take: its group neighbour's time while both are on.
-- property foreground L90
-- property accent L91
-- property urgent L92
-- property dim L93
-- property fontFamily L94
-- property hoverFill L95
-- component KeyCap L106: A key as printed on the keyboard, for the keys the panel answers to.
-- component StageRow L129: glyph-and-name part is a button that runs the stage at once.
-- component StageGroup L234
+- property svc L25
+- property ready L26
+- property stayAwake L27
+- property powerSaving L28
+- property displayStages L32: `nowKey` runs it at once, as a click on the row's name does.
+- property systemStages L36
+- property stages L40
+- function stageEnabled L42
+- function stageSeconds L43
+- function stageMinutes L44
+- function setStageEnabled L45
+- function setStageMinutes L46
+- function toggleStage L47
+- function togglePowerSaving L48
+- function lockNow L49
+- function suspendNow L50
+- function screensaverNow L51
+- function standbyNow L52
+- function runStageNow L53
+- property stageList L60
+- property summary L68
+- property stagesOn L70
+- property scheduleStatus L72: Above the schedule; empty while it runs normally, since the dots say it all.
+- function minutesRange L86: minute, or out of order by hand, is shown as it is and not clamped.
+- property foreground L95
+- property accent L96
+- property urgent L97
+- property dim L98
+- property fontFamily L99
+- property hoverFill L100
+- component KeyCap L111: A key as printed on the keyboard, for the keys the panel answers to.
+- component StageRow L134: glyph-and-name part is a button that runs the stage at once.
+- component StageGroup L240
 
-## Service.qml (1173 lines)
+## Service.qml (1180 lines)
 Power-saving idle service in four stages, each with its own switch and
 - property shell L57: Injected by omarchy-shell (the service loader).
 - property home L59
@@ -217,19 +217,20 @@ Power-saving idle service in four stages, each with its own switch and
 - function stageTimeoutBounds L690: that is off has no neighbour limit; it is moved into range when turned on.
 - function setStageTimeout L695
 - function timeoutWhenEnabled L705: that keeps it in order with the other stage of its group.
-- function setStageEnabled L717
-- function setGatedStage L750: a second write would start from config that has not reloaded yet.
-- function persistStayAwake L758
-- function refreshStayAwakeState L773
-- function applyShellConfigText L777
-- function refreshScreensaverToggle L787
-- function applyScreensaverOff L791
-- function applyStayAwake L799
-- function handleStockIdle L826: this one stays paused instead of fighting them for the setting.
-- function setIdleEnabled L842
-- function armMonitor L873
-- function syncMonitors L890
+- function noteMoved L713: Tells the panel a stage was moved; called only once the write went through.
+- function setStageEnabled L718
+- function setGatedStage L755: a second write would start from config that has not reloaded yet.
+- function persistStayAwake L765
+- function refreshStayAwakeState L780
+- function applyShellConfigText L784
+- function refreshScreensaverToggle L794
+- function applyScreensaverOff L798
+- function applyStayAwake L806
+- function handleStockIdle L833: this one stays paused instead of fighting them for the setting.
+- function setIdleEnabled L849
+- function armMonitor L880
+- function syncMonitors L897
 
-## tests/idle-model.test.js (49 lines)
+## tests/idle-model.test.js (56 lines)
 Stage order within a group: `node --test tests/`.
 - function states L6

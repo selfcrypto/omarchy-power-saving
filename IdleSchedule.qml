@@ -6,10 +6,9 @@ import "IdleModel.js" as IdleModel
 
 // The stages in the order they fire: one stop per stage, sorted by timeout,
 // evenly spaced. A stage that is on is a filled dot; one that is off is a ring
-// at its own time, so turning it on shows where it would land. Stages that
-// are on and the line between them are in the accent, also while stay awake
-// pauses them; the line is faint outside that span. Clicking a stop turns
-// its stage on or off.
+// at its own time. Stages that are on and the line between them are in the
+// accent, also while stay awake pauses them; the line is faint outside that
+// span. Clicking a stop turns its stage on or off.
 Rectangle {
   id: root
 
@@ -100,7 +99,6 @@ Rectangle {
             id: stop
             required property var modelData
             readonly property bool armed: root.available && modelData.enabled
-            readonly property bool live: armed
             width: root.cell
             implicitHeight: stopColumn.implicitHeight
 
@@ -112,7 +110,7 @@ Rectangle {
               Text {
                 width: parent.width
                 text: stop.modelData.glyph
-                color: stop.live ? root.accent : root.secondary
+                color: stop.armed ? root.accent : root.secondary
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.icon
                 horizontalAlignment: Text.AlignHCenter
@@ -123,7 +121,7 @@ Rectangle {
                 width: root.dot
                 height: width
                 radius: width / 2
-                color: stop.live ? root.accent : (stop.armed ? root.secondary : "transparent")
+                color: stop.armed ? root.accent : "transparent"
                 border.width: stop.armed ? 0 : 1
                 border.color: root.secondary
               }

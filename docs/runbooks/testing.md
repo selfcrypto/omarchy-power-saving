@@ -28,7 +28,8 @@ The hot reload keeps the old compiled QML, so the restart is needed. The panel o
 whose bar answers the IPC. Stay awake is on while an agent works; `omarchy-shell idle enable` shows
 the schedule live and `omarchy-shell idle disable` turns stay awake back on.
 
-Stage order through IPC (expect a refusal, then put the old values back):
+Stage order through IPC. With standby on, this is refused with the allowed range; with standby
+off it is accepted, so note the old values first and put them back:
 
 ```bash
 omarchy-shell idle status

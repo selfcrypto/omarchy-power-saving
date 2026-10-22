@@ -94,10 +94,11 @@ function timeoutBounds(name, stages, minSeconds) {
   return { min: min, max: max }
 }
 
-// `seconds` moved into `bounds`.
+// `seconds` moved into `bounds`. The minimum wins over a neighbour's time
+// written by hand below it.
 function clampToBounds(seconds, bounds) {
-  var s = Math.max(bounds.min, seconds)
-  return bounds.max >= 0 ? Math.min(bounds.max, s) : s
+  var s = bounds.max >= 0 ? Math.min(bounds.max, seconds) : seconds
+  return Math.max(bounds.min, s)
 }
 
 // Earliest deadline among the enabled screensaver/lock stages; those two

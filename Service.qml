@@ -706,12 +706,13 @@ Item {
     var states = stageStates()
     states[name].enabled = true
     var bounds = IdleModel.timeoutBounds(name, states, root.minTimeoutSeconds)
-    var seconds = IdleModel.clampToBounds(stageTimeout(name), bounds)
-    if (seconds !== stageTimeout(name)) {
-      root.orderNote = IdleModel.stageLabel(name) + " moved to " + IdleModel.durationText(seconds)
-      orderNoteTimer.restart()
-    }
-    return seconds
+    return IdleModel.clampToBounds(stageTimeout(name), bounds)
+  }
+
+  // Tells the panel a stage was moved; called only once the write went through.
+  function noteMoved(name, seconds) {
+    root.orderNote = IdleModel.stageLabel(name) + " moved to " + IdleModel.durationText(seconds)
+    orderNoteTimer.restart()
   }
 
   function setStageEnabled(name, value) {
@@ -719,9 +720,13 @@ Item {
     if (name === "screensaver") {
       if (root.screensaverToggleLoaded && root.screensaverEnabled === enabled) return true
       // The switch is a toggle file, the timeout is config: two writes.
+      // A move that cannot be written leaves the stage off rather than out of order.
       if (enabled) {
         var seconds = timeoutWhenEnabled(name)
-        if (seconds !== stageTimeout(name)) mutateIdleConfig(name + "=" + seconds, function(idle) { idle[name] = seconds })
+        if (seconds !== stageTimeout(name)) {
+          if (!mutateIdleConfig(name + "=" + seconds, function(idle) { idle[name] = seconds })) return false
+          noteMoved(name, seconds)
+        }
       }
       root.screensaverOff = !enabled
       root.screensaverToggleLoaded = true
@@ -749,10 +754,12 @@ Item {
   // a second write would start from config that has not reloaded yet.
   function setGatedStage(name, enabled) {
     var seconds = enabled ? timeoutWhenEnabled(name) : stageTimeout(name)
-    return mutateIdleConfig(name + " " + (enabled ? "on" : "off"), function(idle) {
+    var written = mutateIdleConfig(name + " " + (enabled ? "on" : "off"), function(idle) {
       idle[name + "Enabled"] = enabled
       idle[name] = seconds
     })
+    if (written && seconds !== stageTimeout(name)) noteMoved(name, seconds)
+    return written
   }
 
   function persistStayAwake(value) {
@@ -1144,7 +1151,7 @@ Item {
       if (String(seconds || "") === "") return String(root.stageTimeout(name))
       if (root.setStageTimeout(name, seconds)) return "ok"
       var bounds = root.stageTimeoutBounds(name)
-      return "invalid timeout (" + bounds.min + " s to " + (bounds.max >= 0 ? bounds.max + " s" : "any") + ")"
+      return "invalid timeout (" + (bounds.max >= 0 ? bounds.min + " s to " + bounds.max + " s" : "min " + bounds.min + " s") + ")"
     }
 
     // omarchy-shell idle screensaver  → screensaver now, even with the stage off
