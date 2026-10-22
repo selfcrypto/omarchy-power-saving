@@ -9,14 +9,14 @@ Budget 15 KB.
 |---|---|
 | Released | 1.4.5 (`be25c0f`), verified on the marketplace (#11121) |
 | `main` on GitHub | 1.5.0, the commit named in issue #12622 |
-| Tag `v1.5.0` | On `61ace1e`, the first 1.5.0 push; later fixes (AGENTS.md as a file, Fable review fixes) are after it |
+| Tag `v1.5.0` | On the commit named in #12622 (moved there on 2026-10-22) |
 | Marketplace | #12622 `[Verify]` 1.5.0: compatibility and security baseline passed, waiting for a maintainer |
 | Installed copy | Runs the 1.5.0 files, copied in for the live check |
 
 ## Pending
 
 1. #12622 approved. While it is open, a push makes it stale: edit its body to the new HEAD SHA and watch the bot.
-2. Move tag `v1.5.0` to the verified commit, or leave it. Waits on Kike.
+2. Push this repo's local docs commits (status only) once #12622 is approved.
 3. After approval, `omarchy plugin update io.github.selfcrypto.power-saving` so the installed copy is clean again.
 4. Config writes close together can lose the first: `mutateIdleConfig` rebuilds the entry from the
    last file reload, so a second write before the reload (stepper commit, then a switch click on
