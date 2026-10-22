@@ -7,14 +7,14 @@ import qs.Ui
 import "IdleModel.js" as IdleModel
 
 // Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
-// listing the four idle stages in the two groups they belong to — display
-// (screensaver, standby) and system (lock, suspend) — each with a switch and a
-// minutes field. All state lives in Service.qml, which the shell loads once;
+// that draws the four idle stages in the order they fire (IdleSchedule.qml),
+// then lists them in their two groups, display (screensaver, standby) and
+// system (lock, suspend), each with a switch and a minutes stepper. All state lives in Service.qml, which the shell loads once;
 // this widget exists once per monitor and only reads from and calls into that
 // service, so the copies never disagree.
 //
 // Left-click opens the panel, right-click toggles stay-awake. NOTE: after
-// editing this file run `omarchy restart shell` — the hot reload
+// editing this file run `omarchy restart shell`. The hot reload
 // re-instantiates but keeps the old compiled QML.
 Panel {
   id: root
@@ -60,19 +60,39 @@ Panel {
     var list = []
     for (var i = 0; i < stages.length; i++) {
       var key = stages[i].key
-      list.push({ key: key, glyph: stages[i].glyph, enabled: root.stageEnabled(key), seconds: root.stageSeconds(key) })
+      list.push({ key: key, glyph: stages[i].glyph, number: stages[i].number, enabled: root.stageEnabled(key), seconds: root.stageSeconds(key) })
     }
     return list
   }
   readonly property string summary: ready ? IdleModel.summaryText(stageList) : "Service not running"
-  readonly property string compactSummary: ready ? IdleModel.compactSummaryText(stageList) : "Service not running"
 
-  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
+  readonly property int stagesOn: stageList.filter(function(stage) { return stage.enabled }).length
+  // Above the schedule; empty while it runs normally, since the dots say it all.
+  readonly property string scheduleStatus: {
+    if (!ready) return "Service not running"
+    if (svc.orderNote !== "") return svc.orderNote
+    if (svc.stockIdleEnabled) return "Paused while omarchy.idle is on. Run: omarchy plugin disable omarchy.idle"
+    if (stayAwake) return "Paused. t resumes"
+    if (svc.standbyActive) return "Displays in standby"
+    if (svc.screensaverWindowCount > 0) return "Screensaver running"
+    if (stagesOn === 0) return "All stages off"
+    return ""
+  }
+
+  // Minutes a stage's field may take: its group neighbour's time while both are on.
+  function minutesRange(key) {
+    if (!ready) return { from: 1, to: 1440 }
+    var b = svc.stageTimeoutBounds(key)
+    var from = Math.max(1, Math.ceil(b.min / 60))
+    return { from: from, to: b.max >= 0 ? Math.max(from, Math.floor(b.max / 60)) : 1440 }
+  }
+
+  readonly property color foreground: Commons.Color.popups.text
   readonly property color accent: Commons.Color.accent
   readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
-  readonly property color dim: Qt.darker(foreground, 1.55)
+  readonly property color dim: Util.alpha(foreground, 0.72)
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property color hoverFill: bar ? Style.hoverFillFor(bar.foreground, Commons.Color.accent) : "transparent"
+  readonly property color hoverFill: Style.hoverFillFor(foreground, accent)
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -82,9 +102,30 @@ Panel {
     if (opened) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
-  // One stage row: glyph, name, what it does and when, minutes, switch. Both
-  // groups use it, so the two sections cannot drift apart. The glyph-and-name
-  // part is a button that runs the stage at once.
+  // A key as printed on the keyboard, for the keys the panel answers to.
+  component KeyCap: Rectangle {
+    required property string label
+    implicitWidth: Math.max(implicitHeight, capText.implicitWidth + Style.space(8))
+    implicitHeight: capText.implicitHeight + Style.space(2)
+    radius: Math.min(Style.cornerRadius, height / 2)
+    color: "transparent"
+    border.width: 1
+    border.color: Util.alpha(root.foreground, 0.28)
+
+    Text {
+      id: capText
+      anchors.centerIn: parent
+      textFormat: Text.PlainText
+      text: parent.label
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+  }
+
+  // One stage row: glyph, number and name, the key that runs it, minutes,
+  // switch. Both groups use it, so the two sections cannot drift apart. The
+  // glyph-and-name part is a button that runs the stage at once.
   component StageRow: Rectangle {
     id: row
     required property var modelData
@@ -93,10 +134,9 @@ Panel {
     readonly property int minutes: root.stageMinutes(key)
     readonly property bool hovered: rowMouse.containsMouse || runMouse.containsMouse || minutesField.hovering || stageSwitch.containsMouse
     width: parent ? parent.width : 0
-    height: Style.space(50)
+    height: Math.max(Style.space(44), rowLayout.implicitHeight + Style.space(10))
     radius: Style.cornerRadius
     color: row.hovered ? root.hoverFill : "transparent"
-    opacity: root.powerSaving || !root.ready ? 1.0 : 0.55
 
     MouseArea {
       id: rowMouse
@@ -128,45 +168,50 @@ Panel {
       anchors.fill: parent
       anchors.leftMargin: Style.space(8)
       anchors.rightMargin: Style.space(10)
-      spacing: Style.space(10)
+      spacing: Style.space(8)
+
+      Rectangle {
+        Layout.preferredWidth: Style.space(30)
+        Layout.preferredHeight: Style.space(30)
+        radius: Style.cornerRadius
+        color: row.isOn ? Style.selectedAccentFill : Style.normalFillFor(root.foreground, root.accent)
+
+        Text {
+          anchors.centerIn: parent
+          text: row.modelData.glyph
+          color: row.isOn ? root.accent : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.icon
+        }
+      }
 
       Text {
-        Layout.preferredWidth: Style.space(20)
-        text: row.modelData.glyph
+        text: row.modelData.number + "  " + IdleModel.stageLabel(row.key)
         color: row.isOn ? root.foreground : root.dim
         font.family: root.fontFamily
-        font.pixelSize: Style.font.title
-        horizontalAlignment: Text.AlignHCenter
-      }
-
-      ColumnLayout {
+        font.pixelSize: Style.font.body
+        font.bold: row.isOn
+        elide: Text.ElideRight
         Layout.fillWidth: true
-        spacing: 0
-
-        Text {
-          text: row.modelData.number + "  " + IdleModel.stageLabel(row.key)
-          color: row.isOn ? root.foreground : root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-        }
-
-        Text {
-          Layout.fillWidth: true
-          text: row.isOn ? "after " + IdleModel.durationText(root.stageSeconds(row.key)) : "off"
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-        }
+        Layout.maximumWidth: implicitWidth
+        Layout.minimumWidth: Math.min(implicitWidth, Style.space(60))
       }
+
+      KeyCap { label: row.modelData.nowKey }
+
+      Item { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.horizontalStretchFactor: 0 }
 
       MinutesField {
         id: minutesField
+        readonly property var range: root.minutesRange(row.key)
+        from: range.from
+        to: range.to
         shownValue: row.minutes
         foreground: root.foreground
         accent: root.accent
         fontFamily: root.fontFamily
-        opacity: row.isOn ? 1.0 : 0.6
+        enabled: root.ready
+        Accessible.name: IdleModel.stageLabel(row.key) + " idle minutes"
         onCommitted: function(v) { root.setStageMinutes(row.key, v) }
       }
 
@@ -181,6 +226,37 @@ Panel {
           visible: stageSwitch.containsMouse
           text: row.modelData.hint
           fontFamily: root.fontFamily
+        }
+      }
+    }
+  }
+
+  component StageGroup: Column {
+    id: group
+    required property string title
+    required property var entries
+    width: parent ? parent.width : 0
+    spacing: Style.space(6)
+
+    PanelSectionHeader {
+      text: group.title
+      foreground: root.foreground
+      color: root.dim
+      fontFamily: root.fontFamily
+    }
+
+    Rectangle {
+      width: parent.width
+      height: groupRows.implicitHeight
+      radius: Style.cornerRadius
+      color: Style.normalFillFor(root.foreground, root.accent)
+
+      Column {
+        id: groupRows
+        width: parent.width
+        Repeater {
+          model: group.entries
+          delegate: StageRow {}
         }
       }
     }
@@ -210,8 +286,8 @@ Panel {
     bar: root.bar
     open: root.opened
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(360))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(580))
+    contentWidth: panel.fittedContentWidth(Style.space(420))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(640))
 
     // Not the stock PanelKeyCatcher: it fires on key press only, and turns
     // lowercase "l" into a cursor move before any panel sees it. Two things
@@ -259,94 +335,103 @@ Panel {
         else root.screensaverNow()
       }
 
-      Column {
-        id: column
-        width: parent.width
-        spacing: Style.space(10)
+      Flickable {
+        id: scheduleViewport
+        anchors.fill: parent
+        contentHeight: column.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
 
-        PanelHero {
-          width: parent.width
-          title: "Power saving"
-          meta: root.ready && root.svc.stockIdleEnabled
-            ? "Paused · run: omarchy plugin disable omarchy.idle"
-            : (root.stayAwake ? "Staying awake · stages paused" : root.compactSummary)
-          foreground: root.foreground
-          fontFamily: root.fontFamily
-          iconOpacity: root.powerSaving ? 1.0 : 0.6
-          iconComponent: Component {
-            Text {
-              text: root.stayAwake ? "󰅶" : "󰒲"
-              color: root.stayAwake ? root.urgent : root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.display
+        Column {
+          id: column
+          width: scheduleViewport.width
+          spacing: Style.space(12)
+
+          PanelHero {
+            width: parent.width
+            title: "Power saving"
+            meta: !root.ready ? "Unavailable"
+              : (root.stayAwake ? "Staying awake" : (!root.powerSaving ? "Paused" : root.stagesOn + " of 4 stages on"))
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            iconComponent: Component {
+              Text {
+                text: root.stayAwake ? "󰅶" : "󰒲"
+                color: root.stayAwake ? root.urgent : root.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.display
+              }
             }
-          }
-          trailingControl: Component {
-            ToggleSwitch {
-              id: powerSwitch
-              checked: root.powerSaving
-              interactive: root.ready
-              foreground: root.foreground
-              onToggled: root.togglePowerSaving()
+            trailingControl: Component {
+              ToggleSwitch {
+                id: powerSwitch
+                checked: root.powerSaving
+                interactive: root.ready
+                foreground: root.foreground
+                onToggled: root.togglePowerSaving()
 
-              PanelToolTip {
-                visible: powerSwitch.containsMouse
-                text: root.powerSaving ? "Stay awake (pause all stages)" : "Resume power saving"
-                fontFamily: root.fontFamily
+                PanelToolTip {
+                  visible: powerSwitch.containsMouse
+                  text: root.powerSaving ? "Stay awake (pause all stages)" : "Resume power saving"
+                  fontFamily: root.fontFamily
+                }
               }
             }
           }
-        }
 
-        Column {
-          width: parent.width
-          spacing: Style.space(2)
-
-          PanelSectionHeader {
-            text: "DISPLAY · MINUTES OF IDLE"
+          IdleSchedule {
+            width: parent.width
+            stages: root.stageList
+            status: root.scheduleStatus
+            paused: !root.powerSaving
+            available: root.ready
             foreground: root.foreground
+            accent: root.accent
             fontFamily: root.fontFamily
+            onStageClicked: function(key) { root.toggleStage(key) }
           }
 
-          Repeater {
-            model: root.displayStages
-            delegate: StageRow {}
-          }
-        }
-
-        Column {
-          width: parent.width
-          spacing: Style.space(2)
-
-          PanelSectionHeader {
-            text: "SYSTEM · MINUTES OF IDLE"
-            foreground: root.foreground
-            fontFamily: root.fontFamily
+          StageGroup {
+            title: "Display"
+            entries: root.displayStages
           }
 
-          Repeater {
-            model: root.systemStages
-            delegate: StageRow {}
+          StageGroup {
+            title: "System"
+            entries: root.systemStages
           }
-        }
 
-        PanelSeparator { width: parent.width }
+          PanelSeparator { width: parent.width; foreground: root.foreground }
 
-        // Three lines by hand: one string wraps mid-shortcut at this width.
-        Column {
-          width: parent.width
-          spacing: Style.space(2)
+          // Run keys live beside their stage; global keys stay in the footer.
+          Column {
+            width: parent.width
+            spacing: Style.space(2)
 
-          Repeater {
-            model: ["t stay awake · 1-4 stage on/off", "run now: click a stage, or r screensaver", "o standby · k lock · s suspend"]
-            delegate: Text {
-              required property string modelData
+            Flow {
               width: parent.width
-              text: modelData
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              horizontalAlignment: Text.AlignHCenter
+              spacing: Style.space(6)
+
+              Repeater {
+                model: [{ key: "t", text: "stay awake" }, { key: "1–4", text: "stage on/off" }, { key: "click", text: "a name runs it" }]
+                delegate: Row {
+                  id: hint
+                  required property var modelData
+                  spacing: Style.space(5)
+                  rightPadding: Style.space(8)
+
+                  KeyCap { label: hint.modelData.key }
+
+                  Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    textFormat: Text.PlainText
+                    text: hint.modelData.text
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+              }
             }
           }
         }

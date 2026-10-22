@@ -55,7 +55,7 @@ function screensaverWindowsAfter(windows, address, visible) {
 
 // ---------------------------------------------------------------- stages
 
-// Firing order within a group is the panel's order.
+// Firing order within a group is the panel's order (see GROUP_ORDER).
 var STAGES = ["screensaver", "standby", "lock", "suspend"]
 
 var STAGE_LABELS = {
@@ -71,6 +71,33 @@ function isStage(name) {
 
 function stageLabel(name) {
   return STAGE_LABELS[name] || String(name)
+}
+
+// Within a group the earlier stage may not fire after the later one: the
+// screensaver no later than standby, lock no later than suspend. Equal times
+// are allowed. Only stages that are on are held to it.
+var GROUP_ORDER = [["screensaver", "standby"], ["lock", "suspend"]]
+
+// Seconds `name` may be set to while it is on, given `stages` as
+// { key: { enabled, seconds } }: { min, max }, max -1 when there is no limit.
+function timeoutBounds(name, stages, minSeconds) {
+  var min = minSeconds
+  var max = -1
+  for (var i = 0; i < GROUP_ORDER.length; i++) {
+    var earlier = GROUP_ORDER[i][0]
+    var later = GROUP_ORDER[i][1]
+    if (later === name && stages[earlier] && stages[earlier].enabled)
+      min = Math.max(min, stages[earlier].seconds)
+    if (earlier === name && stages[later] && stages[later].enabled)
+      max = stages[later].seconds
+  }
+  return { min: min, max: max }
+}
+
+// `seconds` moved into `bounds`.
+function clampToBounds(seconds, bounds) {
+  var s = Math.max(bounds.min, seconds)
+  return bounds.max >= 0 ? Math.min(bounds.max, s) : s
 }
 
 // Earliest deadline among the enabled screensaver/lock stages; those two

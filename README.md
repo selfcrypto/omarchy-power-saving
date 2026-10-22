@@ -18,7 +18,7 @@ This plugin replaces it.
 
 ## Preview
 
-![Power Saving panel with the display and system stages](preview.png)
+![Power Saving panel: the idle schedule above the display and system stages](preview.png)
 
 ## Install
 
@@ -83,10 +83,24 @@ Bar icon:
 
 Panel:
 
-- Each stage row has a minutes field and a switch. Click the field and type
-  the minutes; Enter applies them, the arrows and Up/Down step.
-- Clicking the icon or the name of a stage runs that stage immediately.
+- The schedule at the top shows the stages in the order they fire, by
+  timeout. A stage that is on is a filled dot, one that is off is a ring with
+  its time struck through. Clicking a dot switches that stage on or off. The
+  line goes grey while stay awake is on.
+- Each stage row has a minutes stepper and a switch. Click the stepper and
+  type the minutes; Enter applies them, the −/+ buttons and Up/Down step.
+- Clicking the icon or the name of a stage runs that stage immediately. The
+  key beside the name does the same.
 - The switch at the top toggles stay awake.
+
+Order within a group:
+
+- While both are on, the screensaver cannot come after standby, and lock
+  cannot come after suspend. Equal times are allowed. Lock and standby are
+  in different groups and can be in either order.
+- The steppers stop at the other stage's time.
+- Switching a stage on moves its time to the nearest one that keeps the
+  order, and the panel says so ("Standby moved to 5 min").
 
 Keys in the panel:
 
@@ -186,7 +200,9 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
 | `lockEnabled` | Lock stage on or off | `true` |
 | `suspendEnabled` | Suspend stage on or off | `false` |
 
-The minimum timeout is 10 seconds.
+The minimum timeout is 10 seconds. The panel and the IPC `timeout` call keep
+the order within a group described above; values written to `shell.json` by
+hand are used as they are.
 
 A key that is missing from the entry is read from the stock `idle` block of
 `shell.json`. The first edit from the panel copies all keys onto the entry.

@@ -49,14 +49,14 @@ QQC.SpinBox {
   // The box has no child that takes focus on its own; a click must give it to the box.
   focusPolicy: Qt.StrongFocus
   // implicitWidth, not width: inside the row's RowLayout only the implicit size counts.
-  implicitWidth: Style.space(84)
+  implicitWidth: Style.space(100)
   implicitHeight: Math.max(Style.spacing.controlHeight, Style.font.body + Style.spacing.controlPaddingY * 2)
   font.family: fontFamily
   font.pixelSize: Style.font.body
   Accessible.name: "Minutes"
 
-  leftPadding: Border.left(borderSpec) + Style.spacing.controlPaddingX
-  rightPadding: Border.right(borderSpec) + Style.spacing.controlPaddingX
+  leftPadding: Style.space(22)
+  rightPadding: Style.space(22)
   topPadding: Border.top(borderSpec)
   bottomPadding: Border.bottom(borderSpec)
 
@@ -158,12 +158,55 @@ QQC.SpinBox {
     HoverHandler { id: hover }
   }
 
-  contentItem: Text {
-    textFormat: Text.PlainText
-    text: root.typed !== "" ? root.typed : root.displayText
-    font: root.font
-    color: root.foreground
-    horizontalAlignment: Qt.AlignHCenter
-    verticalAlignment: Qt.AlignVCenter
+  down.indicator: Rectangle {
+    x: 0
+    width: Style.space(22)
+    height: root.height
+    radius: Style.cornerRadius
+    color: root.down.pressed ? Style.pressedFillFor(root.foreground, root.accent)
+      : (root.down.hovered ? Style.hoverFillFor(root.foreground, root.accent) : "transparent")
+    Text {
+      anchors.centerIn: parent
+      text: "−"
+      font: root.font
+      color: root.foreground
+      opacity: root.value > root.from ? 1 : 0.4
+    }
+  }
+
+  up.indicator: Rectangle {
+    x: root.width - width
+    width: Style.space(22)
+    height: root.height
+    radius: Style.cornerRadius
+    color: root.up.pressed ? Style.pressedFillFor(root.foreground, root.accent)
+      : (root.up.hovered ? Style.hoverFillFor(root.foreground, root.accent) : "transparent")
+    Text {
+      anchors.centerIn: parent
+      text: "+"
+      font: root.font
+      color: root.foreground
+      opacity: root.value < root.to ? 1 : 0.4
+    }
+  }
+
+  contentItem: Item {
+    Row {
+      anchors.centerIn: parent
+      spacing: Style.space(3)
+      Text {
+        textFormat: Text.PlainText
+        text: root.typed !== "" ? root.typed : root.displayText
+        font: root.font
+        color: root.foreground
+      }
+      Text {
+        text: "min"
+        anchors.baseline: parent.children[0].baseline
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        color: Util.alpha(root.foreground, 0.72)
+      }
+    }
   }
 }

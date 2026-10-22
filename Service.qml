@@ -48,7 +48,7 @@ import "IdleModel.js" as IdleModel
 // see the user go idle. Once that is known they run on timers counted from
 // that moment (see the away section), because the compositor resets the
 // monitors whenever this service opens or closes the screensaver or locks.
-// NOTE: after editing this file run `omarchy restart shell` — the hot reload
+// NOTE: after editing this file run `omarchy restart shell`. The hot reload
 // re-instantiates but keeps the old compiled QML.
 Item {
   id: root
@@ -141,6 +141,9 @@ Item {
   property string lastEventAt: ""
   property string lastStandbyAt: ""
   property string lastSuspendAt: ""
+  // Set when turning a stage on moved its timeout to keep the group order;
+  // the panel shows it for a few seconds.
+  property string orderNote: ""
   property var screensaverWindows: ({})
   property int screensaverWindowCount: 0
 
@@ -175,7 +178,7 @@ Item {
   // Never onto dark monitors. A DisplayPort monitor in DPMS off can drop its
   // link and be reported unplugged: Hyprland then removes it, so a screensaver
   // started meanwhile opens into a one-monitor layout, and when the monitor
-  // returns on input the window is carried back with a stale input box —
+  // returns on input the window is carried back with a stale input box,
   // painted over the whole monitor, clicks falling through to the desktop.
   // Nothing is lost by skipping it: the input that wakes the monitors ends
   // the cycle anyway, and the lock stage keeps its own timer. The state is
@@ -198,7 +201,7 @@ Item {
 
   // The screensaver on request (panel, IPC), outside any idle cycle: "force"
   // starts it with the stage switched off too. An idle cycle that begins
-  // while it is still up adopts it — omarchy-launch-screensaver exits early
+  // while it is still up adopts it: omarchy-launch-screensaver exits early
   // when one is running, and its windows are already tracked.
   function startScreensaver(reason) {
     logEvent("screensaver-now", reason || "requested")
@@ -466,19 +469,19 @@ Item {
   // parsed as Lua), so the dispatcher is reached through hl.dsp. The action
   // MUST be passed as `{action = "off"}`: hl.dsp.dpms("off"), and every other
   // shape tried, builds a valid dispatcher whose argument is then ignored, and
-  // the dispatch *toggles* — verified against /sys/class/drm/*/dpms, which is
+  // the dispatch *toggles*. Verified against /sys/class/drm/*/dpms, which is
   // also the only trustworthy read of the state (`hyprctl monitors` reports
   // dpmsStatus a dispatch behind). A toggle would be silently wrong here: two
   // stages racing, or a lost wake, would leave the desktop dark. With `action`
-  // the dispatch is idempotent, so a redundant "on" costs nothing — which is
+  // the dispatch is idempotent, so a redundant "on" costs nothing. That is
   // also why neither call is gated on standbyActive: Hyprland wakes the
   // monitors itself on input, and a service that still believed them off
   // would refuse the next standby. standbyActive only records the last
   // dispatch, for the status output.
   //
-  // Monitors also come back on their own on key press or mouse move —
-  // misc.key_press_enables_dpms and misc.mouse_move_enables_dpms are on in
-  // Omarchy's defaults — but a wake from anywhere else would leave a black
+  // Monitors also come back on their own on key press or mouse move
+  // (misc.key_press_enables_dpms and misc.mouse_move_enables_dpms are on in
+  // Omarchy's defaults), but a wake from anywhere else would leave a black
   // desktop, so activity turns them on explicitly too. Off and on run in their
   // own processes: a still-running "off" must never make the "on" that follows
   // it a no-op.
@@ -501,7 +504,7 @@ Item {
   // reason none is started while they are (see launchScreensaver): its windows
   // would ride the monitor that drops out and come back broken. Its windows
   // are forgotten first so the closewindow events that follow do not read as
-  // the user dismissing it — the pending lock keeps its timer. The kill is
+  // the user dismissing it; the pending lock keeps its timer. The kill is
   // the one omarchy-system-lock does, a no-op when nothing is running, and it
   // runs in the same shell *ahead of* the DPMS off: omarchy-screensaver's
   // exit handler restores the cursor through a Hyprland config keyword, and a
@@ -672,17 +675,54 @@ Item {
     return written !== false
   }
 
+  // Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
+  function stageStates() {
+    var out = {}
+    for (var i = 0; i < IdleModel.STAGES.length; i++) {
+      var key = IdleModel.STAGES[i]
+      out[key] = { enabled: stageEnabled(key), seconds: stageTimeout(key) }
+    }
+    return out
+  }
+
+  // Seconds `name` may be set to: { min, max }, max -1 for no limit. A stage
+  // that is off has no neighbour limit; it is moved into range when turned on.
+  function stageTimeoutBounds(name) {
+    if (!stageEnabled(name)) return { min: root.minTimeoutSeconds, max: -1 }
+    return IdleModel.timeoutBounds(name, stageStates(), root.minTimeoutSeconds)
+  }
+
   function setStageTimeout(name, seconds) {
     if (!IdleModel.isStage(name)) return false
     var n = Math.floor(Number(seconds))
-    if (!isFinite(n) || n < root.minTimeoutSeconds) return false
+    var bounds = stageTimeoutBounds(name)
+    if (!isFinite(n) || n < bounds.min || (bounds.max >= 0 && n > bounds.max)) return false
     return mutateIdleConfig(name + "=" + n, function(idle) { idle[name] = n })
+  }
+
+  // The timeout `name` gets when it is turned on: its own, or the nearest one
+  // that keeps it in order with the other stage of its group.
+  function timeoutWhenEnabled(name) {
+    var states = stageStates()
+    states[name].enabled = true
+    var bounds = IdleModel.timeoutBounds(name, states, root.minTimeoutSeconds)
+    var seconds = IdleModel.clampToBounds(stageTimeout(name), bounds)
+    if (seconds !== stageTimeout(name)) {
+      root.orderNote = IdleModel.stageLabel(name) + " moved to " + IdleModel.durationText(seconds)
+      orderNoteTimer.restart()
+    }
+    return seconds
   }
 
   function setStageEnabled(name, value) {
     var enabled = !!value
     if (name === "screensaver") {
       if (root.screensaverToggleLoaded && root.screensaverEnabled === enabled) return true
+      // The switch is a toggle file, the timeout is config: two writes.
+      if (enabled) {
+        var seconds = timeoutWhenEnabled(name)
+        if (seconds !== stageTimeout(name)) mutateIdleConfig(name + "=" + seconds, function(idle) { idle[name] = seconds })
+      }
       root.screensaverOff = !enabled
       root.screensaverToggleLoaded = true
       logEvent("stage", "screensaver " + (enabled ? "on" : "off"))
@@ -692,17 +732,27 @@ Item {
     }
     if (name === "standby") {
       if (root.standbyEnabled === enabled) return true
-      return mutateIdleConfig("standby " + (enabled ? "on" : "off"), function(idle) { idle.standbyEnabled = enabled })
+      return setGatedStage("standby", enabled)
     }
     if (name === "lock") {
       if (root.lockEnabled === enabled) return true
-      return mutateIdleConfig("lock " + (enabled ? "on" : "off"), function(idle) { idle.lockEnabled = enabled })
+      return setGatedStage("lock", enabled)
     }
     if (name === "suspend") {
       if (root.suspendEnabled === enabled) return true
-      return mutateIdleConfig("suspend " + (enabled ? "on" : "off"), function(idle) { idle.suspendEnabled = enabled })
+      return setGatedStage("suspend", enabled)
     }
     return false
+  }
+
+  // Standby, lock and suspend: switch and timeout in one config write, since
+  // a second write would start from config that has not reloaded yet.
+  function setGatedStage(name, enabled) {
+    var seconds = enabled ? timeoutWhenEnabled(name) : stageTimeout(name)
+    return mutateIdleConfig(name + " " + (enabled ? "on" : "off"), function(idle) {
+      idle[name + "Enabled"] = enabled
+      idle[name] = seconds
+    })
   }
 
   function persistStayAwake(value) {
@@ -769,7 +819,7 @@ Item {
   }
 
   // This plugin replaces omarchy.idle, so enabling it is the whole consent
-  // needed to switch the stock service off — one `omarchy plugin add … --enable`
+  // needed to switch the stock service off: one `omarchy plugin add … --enable`
   // is the entire installation. Done once per shell session: a user who
   // deliberately re-enables the stock service afterwards gets the notice and
   // this one stays paused instead of fighting them for the setting.
@@ -798,7 +848,7 @@ Item {
   // Quickshell 0.3.1 bug: when an IdleMonitor's timeout (or enabled) changes
   // it destroys and recreates its ext_idle_notification in place, and when the
   // allocator hands the new one the old address the isIdle binding sees no
-  // change and keeps watching the dead object — the monitor never fires again
+  // change and keeps watching the dead object, so the monitor never fires again
   // (verified standalone: Hyprland logs "marked idle", QML isIdle stays
   // false). So a monitor is never reconfigured here: every enabled/timeout
   // combination is a brand-new IdleMonitor with the timeout set at creation,
@@ -864,6 +914,12 @@ Item {
   onStandbyTimeoutSecondsChanged: syncMonitors()
   onSuspendArmedChanged: syncMonitors()
   onSuspendTimeoutSecondsChanged: syncMonitors()
+
+  Timer {
+    id: orderNoteTimer
+    interval: 6000
+    onTriggered: root.orderNote = ""
+  }
 
   Timer {
     id: screensaverTimer
@@ -1086,7 +1142,9 @@ Item {
     function timeout(name: string, seconds: string): string {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       if (String(seconds || "") === "") return String(root.stageTimeout(name))
-      return root.setStageTimeout(name, seconds) ? "ok" : "invalid timeout (min " + root.minTimeoutSeconds + " s)"
+      if (root.setStageTimeout(name, seconds)) return "ok"
+      var bounds = root.stageTimeoutBounds(name)
+      return "invalid timeout (" + bounds.min + " s to " + (bounds.max >= 0 ? bounds.max + " s" : "any") + ")"
     }
 
     // omarchy-shell idle screensaver  → screensaver now, even with the stage off
