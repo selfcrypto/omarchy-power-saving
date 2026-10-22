@@ -113,7 +113,7 @@ Keys in the panel:
 | `k` | Lock now |
 | `s` | Suspend now |
 
-Keys in a minutes field, once it has been clicked:
+Keys in a minutes stepper, once it has been clicked:
 
 | Key | Action |
 |---|---|
