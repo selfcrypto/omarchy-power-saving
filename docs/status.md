@@ -8,13 +8,14 @@ Budget 15 KB.
 | Thing | State |
 |---|---|
 | Released | 1.4.5 (`be25c0f`), verified on the marketplace (#11121) |
-| `main` | 1.5.0: schedule panel, stage order within a group, repo-docs layout |
+| `main` | 1.5.0 pushed and tagged `v1.5.0` at `61ace1e` |
 | Installed copy | Runs the 1.5.0 files, copied in for the live check |
-| Marketplace | 1.5.0 needs a `[Verify]` issue on the HEAD of `main` once pushed |
+| Marketplace | `[Verify]` issue #12622 for `61ace1e`, waiting for the bot and a maintainer |
 
 ## Pending
 
-1. Push `main`, tag `v1.5.0`, open the `[Verify]` issue (`docs/runbooks/release.md`). Waits on Kike.
+1. #12622 approved. Until then push nothing: a new commit makes the issue stale. This status
+   update is committed locally only.
 2. After approval, `omarchy plugin update io.github.selfcrypto.power-saving` so the installed copy is clean again.
 
 ## Standing facts
