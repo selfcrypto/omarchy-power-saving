@@ -29,9 +29,8 @@ Pure helpers shared by Service.qml and Panel.qml. Cloned from
 
 ## IdleSchedule.qml (174 lines)
 The stages in the order they fire: one stop per stage, sorted by timeout,
-- property stages L16: [{ key, glyph, number, enabled, seconds }] in any order.
-- property status L18: One line above the stops; empty hides it.
-- property paused L19
+- property stages L17: [{ key, glyph, number, enabled, seconds }] in any order.
+- property status L19: One line above the stops; empty hides it.
 - property available L20
 - property foreground L21
 - property accent L22
@@ -63,7 +62,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (441 lines)
+## Panel.qml (440 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L24
 - property ready L25

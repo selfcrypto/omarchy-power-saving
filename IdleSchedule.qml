@@ -6,9 +6,10 @@ import "IdleModel.js" as IdleModel
 
 // The stages in the order they fire: one stop per stage, sorted by timeout,
 // evenly spaced. A stage that is on is a filled dot; one that is off is a ring
-// at its own time, so turning it on shows where it would land. The line is
-// solid from the first stage that is on to the last one, faint outside that
-// span and everywhere while paused. Clicking a stop turns its stage on or off.
+// at its own time, so turning it on shows where it would land. Stages that
+// are on and the line between them are in the accent, also while stay awake
+// pauses them; the line is faint outside that span. Clicking a stop turns
+// its stage on or off.
 Rectangle {
   id: root
 
@@ -16,7 +17,6 @@ Rectangle {
   property var stages: []
   // One line above the stops; empty hides it.
   property string status: ""
-  property bool paused: false
   property bool available: true
   property color foreground: Commons.Color.popups.text
   property color accent: Commons.Color.accent
@@ -78,7 +78,7 @@ Rectangle {
 
         delegate: Rectangle {
           required property int index
-          readonly property bool live: root.available && !root.paused
+          readonly property bool live: root.available
             && root.firstOn >= 0 && index >= root.firstOn && index + 1 <= root.lastOn
           x: (index + 0.5) * root.cell + root.dot / 2 + Style.space(4)
           y: glyphProbe.height + Style.space(4) + root.dot / 2 - height / 2
@@ -100,7 +100,7 @@ Rectangle {
             id: stop
             required property var modelData
             readonly property bool armed: root.available && modelData.enabled
-            readonly property bool live: armed && !root.paused
+            readonly property bool live: armed
             width: root.cell
             implicitHeight: stopColumn.implicitHeight
 
@@ -112,7 +112,7 @@ Rectangle {
               Text {
                 width: parent.width
                 text: stop.modelData.glyph
-                color: stop.live ? root.foreground : root.secondary
+                color: stop.live ? root.accent : root.secondary
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.icon
                 horizontalAlignment: Text.AlignHCenter

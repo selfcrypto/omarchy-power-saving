@@ -85,8 +85,8 @@ Panel:
 
 - The schedule at the top shows the stages in the order they fire, by
   timeout. A stage that is on is a filled dot, one that is off is a ring with
-  its time struck through. Clicking a dot switches that stage on or off. The
-  line goes grey while stay awake is on.
+  its time struck through. Stages that are on and the line between them use
+  the theme accent. Clicking a dot switches that stage on or off.
 - Each stage row has a minutes stepper and a switch. Click the stepper and
   type the minutes; Enter applies them, the −/+ buttons and Up/Down step.
 - Clicking the icon or the name of a stage runs that stage immediately. The

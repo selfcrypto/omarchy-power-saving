@@ -383,7 +383,6 @@ Panel {
             width: parent.width
             stages: root.stageList
             status: root.scheduleStatus
-            paused: !root.powerSaving
             available: root.ready
             foreground: root.foreground
             accent: root.accent
