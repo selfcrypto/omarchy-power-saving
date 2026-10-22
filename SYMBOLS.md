@@ -98,7 +98,7 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - component StageRow L134: glyph-and-name part is a button that runs the stage at once.
 - component StageGroup L240
 
-## Service.qml (1180 lines)
+## Service.qml (1184 lines)
 Power-saving idle service in four stages, each with its own switch and
 - property shell L57: Injected by omarchy-shell (the service loader).
 - property home L59
@@ -176,60 +176,60 @@ Power-saving idle service in four stages, each with its own switch and
 - function lockSystem L231
 - function startIdleCycle L239
 - function cancelIdleCycle L262
-- function resetScreensaverWindows L275
-- function setScreensaverWindow L281
-- function handleScreensaverWindowOpened L288
-- function handleScreensaverWindowClosed L294
-- function eventParts L303
-- function handleHyprlandEvent L307
-- property watchIdleSeconds L341: itself only exits on a key press or on losing focus.
-- property ownActionRunning L342
-- property ownActionRecent L344
-- function markOwnAction L346
-- function syncWatchMonitor L352
-- function enterAway L357
-- function endAway L367: Ends the away state without treating it as the user coming back.
-- function noteIdle L381: gone that long. Standby and suspend are (re)scheduled from awaySince.
-- function scheduleAwayStage L387
-- function fireAwayStandby L398
-- function fireAwaySuspend L404
-- function stopScreensaver L410
-- function userReturned L417
-- function handleInput L428
-- function handleActivity L434: A monitor reported activity: `source` is its stage.
-- function handleIdleChanged L449
-- function handleWatchIdleChanged L462
-- property dpmsOffCommand L488: it a no-op.
-- property dpmsOnCommand L489
-- property screensaverStopCommand L514: it turns the monitors off.
-- function standbyDisplays L516
-- function wakeDisplays L529
-- function handleStandbyIdleChanged L535
-- property suspendCommand L548: call, which is what Omarchy's own Suspend menu entry ends up making too.
-- function suspendSystem L550
-- function handleSuspendIdleChanged L571
-- function stageEnabled L582
-- function stageTimeout L590
-- function stageJson L598
-- function statusJson L602
-- function mutateIdleConfig L665: `shell.barConfig`, which is what re-arms the monitors.
-- function stageStates L679: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
-- function stageTimeoutBounds L690: that is off has no neighbour limit; it is moved into range when turned on.
-- function setStageTimeout L695
-- function timeoutWhenEnabled L705: that keeps it in order with the other stage of its group.
-- function noteMoved L713: Tells the panel a stage was moved; called only once the write went through.
-- function setStageEnabled L718
-- function setGatedStage L755: a second write would start from config that has not reloaded yet.
-- function persistStayAwake L765
-- function refreshStayAwakeState L780
-- function applyShellConfigText L784
-- function refreshScreensaverToggle L794
-- function applyScreensaverOff L798
-- function applyStayAwake L806
-- function handleStockIdle L833: this one stays paused instead of fighting them for the setting.
-- function setIdleEnabled L849
-- function armMonitor L880
-- function syncMonitors L897
+- function resetScreensaverWindows L279
+- function setScreensaverWindow L285
+- function handleScreensaverWindowOpened L292
+- function handleScreensaverWindowClosed L298
+- function eventParts L307
+- function handleHyprlandEvent L311
+- property watchIdleSeconds L345: itself only exits on a key press or on losing focus.
+- property ownActionRunning L346
+- property ownActionRecent L348
+- function markOwnAction L350
+- function syncWatchMonitor L356
+- function enterAway L361
+- function endAway L371: Ends the away state without treating it as the user coming back.
+- function noteIdle L385: gone that long. Standby and suspend are (re)scheduled from awaySince.
+- function scheduleAwayStage L391
+- function fireAwayStandby L402
+- function fireAwaySuspend L408
+- function stopScreensaver L414
+- function userReturned L421
+- function handleInput L432
+- function handleActivity L438: A monitor reported activity: `source` is its stage.
+- function handleIdleChanged L453
+- function handleWatchIdleChanged L466
+- property dpmsOffCommand L492: it a no-op.
+- property dpmsOnCommand L493
+- property screensaverStopCommand L518: it turns the monitors off.
+- function standbyDisplays L520
+- function wakeDisplays L533
+- function handleStandbyIdleChanged L539
+- property suspendCommand L552: call, which is what Omarchy's own Suspend menu entry ends up making too.
+- function suspendSystem L554
+- function handleSuspendIdleChanged L575
+- function stageEnabled L586
+- function stageTimeout L594
+- function stageJson L602
+- function statusJson L606
+- function mutateIdleConfig L669: `shell.barConfig`, which is what re-arms the monitors.
+- function stageStates L683: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
+- function stageTimeoutBounds L694: that is off has no neighbour limit; it is moved into range when turned on.
+- function setStageTimeout L699
+- function timeoutWhenEnabled L709: that keeps it in order with the other stage of its group.
+- function noteMoved L717: Tells the panel a stage was moved; called only once the write went through.
+- function setStageEnabled L722
+- function setGatedStage L759: a second write would start from config that has not reloaded yet.
+- function persistStayAwake L769
+- function refreshStayAwakeState L784
+- function applyShellConfigText L788
+- function refreshScreensaverToggle L798
+- function applyScreensaverOff L802
+- function applyStayAwake L810
+- function handleStockIdle L837: this one stays paused instead of fighting them for the setting.
+- function setIdleEnabled L853
+- function armMonitor L884
+- function syncMonitors L901
 
 ## tests/idle-model.test.js (56 lines)
 Stage order within a group: `node --test tests/`.

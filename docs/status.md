@@ -18,7 +18,11 @@ Budget 15 KB.
 1. #12622 approved. While it is open, a push makes it stale: edit its body to the new HEAD SHA and watch the bot.
 2. Push this repo's local docs commits (status only) once #12622 is approved.
 3. After approval, `omarchy plugin update io.github.selfcrypto.power-saving` so the installed copy is clean again.
-4. Config writes close together can lose the first: `mutateIdleConfig` rebuilds the entry from the
+4. Check what logind does when another program holds a sleep lock: the suspend call is
+   interactive and polkit allows ignoring a lock with an admin password, so it may prompt
+   instead of being refused. The README claim was removed until this is tested (needs a real
+   suspend; mind the short-suspend NVMe issue).
+5. Config writes close together can lose the first: `mutateIdleConfig` rebuilds the entry from the
    last file reload, so a second write before the reload (stepper commit, then a switch click on
    another stage within a fraction of a second) overwrites the first. `setGatedStage` already
    writes switch and timeout of one stage together. Fix: keep a pending entry in the service and
@@ -38,3 +42,5 @@ Budget 15 KB.
 - **2026-10-22.** Fable review fixes: a refused stepper write puts the saved value back; steppers
   always include the value they show (times that are not whole minutes); "moved to" only after a
   successful write; the 10 s minimum wins over a neighbour's time set below it by hand.
+- **2026-10-22.** Screensaver left on screen after stay awake cancelled the idle cycle: its windows
+  were forgotten, so mouse movement did not close it. Windows now stay tracked until they close.

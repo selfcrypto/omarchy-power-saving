@@ -269,7 +269,11 @@ Item {
 
     root.idledThisCycle = false
     root.screensaverStartedThisCycle = false
-    resetScreensaverWindows()
+    // A screensaver still on screen stays tracked, so the watch monitor ends
+    // it on the next input. Stay awake switching on cancels the cycle without
+    // closing it; forgetting its windows here left one up that only a key
+    // press could close, and the next cycle's launch found it running and
+    // added nothing.
   }
 
   function resetScreensaverWindows() {

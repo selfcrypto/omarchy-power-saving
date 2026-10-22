@@ -63,3 +63,8 @@ Titles are never changed once cited from another file.
 **Decision.** `preview.png` is 1920×960: name and three plain lines on the left, a screenshot of the panel on the right, cropped to its border.
 **Why.** Matches the layout of the best marketplace previews without showing anything that is not the real panel.
 **Alternative rejected.** An HTML mock-up of the panel: drifts from the real one.
+
+## 2026-10-22 · Cancelling the idle cycle keeps the screensaver tracked
+**Decision.** `cancelIdleCycle` no longer forgets the screensaver windows; they are forgotten when they close or when the service closes them (`stopScreensaver`, standby, lock).
+**Why.** Stay awake switching on while the screensaver was up (Claude's hooks did it every few minutes) cancelled the cycle and forgot windows that stayed on screen. Mouse movement then woke the monitors but left the screensaver, which only a key press closed. The next cycle's launch found it running and added nothing. Reported by Kike twice on 2026-10-22.
+**Alternative rejected.** Closing the screensaver when stay awake switches on: hides it from someone who is away for no reason the user caused.

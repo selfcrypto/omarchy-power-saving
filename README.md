@@ -159,8 +159,7 @@ Suspend:
 - Locks the session first, so the machine wakes to the lock screen.
 - Turns the monitors back on before suspending, so a resume does not show a
   black screen.
-- Goes through logind, needs no privileges and is refused while a sleep
-  inhibitor is held.
+- Goes through logind and needs no privileges.
 - Idle inhibitors are respected.
 
 All four timeouts count from the moment you went idle. Starting the
