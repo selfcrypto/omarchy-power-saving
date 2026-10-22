@@ -281,6 +281,10 @@ Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock` and
   snapshot the host passes to plugins. In 4.0.3 that snapshot is refreshed
   one config event late.
 
+## Working on the code
+
+Start with `CLAUDE.md`: the map of the code, the current state and the release steps.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
