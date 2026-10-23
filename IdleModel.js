@@ -122,6 +122,33 @@ function firstTimeout(screensaverOn, screensaverSeconds, lockOn, lockSeconds) {
   return first < 0 ? screensaverSeconds : first
 }
 
+// "Next: Screensaver after 2 min idle" for the earliest stage that is on,
+// "" when none is.
+function nextStageText(stages) {
+  var next = null
+  for (var i = 0; i < stages.length; i++) {
+    if (stages[i].enabled && (next === null || stages[i].seconds < next.seconds)) next = stages[i]
+  }
+  return next ? "Next: " + stageLabel(next.key) + " after " + durationText(next.seconds) + " idle" : ""
+}
+
+// Why `name`'s time is bounded, given `stages` as { key: { enabled, seconds } }:
+// "Lock cannot follow Suspend", "" when nothing bounds it. A stage that is
+// off has no bounds.
+function boundsReason(name, stages) {
+  if (!stages[name] || !stages[name].enabled) return ""
+  var reasons = []
+  for (var i = 0; i < GROUP_ORDER.length; i++) {
+    var earlier = GROUP_ORDER[i][0]
+    var later = GROUP_ORDER[i][1]
+    if (earlier === name && stages[later] && stages[later].enabled)
+      reasons.push(stageLabel(name) + " cannot follow " + stageLabel(later))
+    if (later === name && stages[earlier] && stages[earlier].enabled)
+      reasons.push(stageLabel(name) + " cannot come before " + stageLabel(earlier))
+  }
+  return reasons.join(". ")
+}
+
 function durationText(seconds) {
   var s = Math.max(0, Math.floor(Number(seconds) || 0))
   if (s < 60) return s + " s"
@@ -186,11 +213,18 @@ function systemdBool(value, fallback) {
 // Without a battery: after the delay, 2 h when unset. With one: at low
 // battery, or after the delay if that comes first; with HibernateOnACPower=no
 // the delay only runs on battery (said in the hint).
+// As the end of "Then hibernate ...": "after 2 h", "after 45 min or at low
+// battery", "at low battery".
 function hibernateDelayText(delay, hasBattery) {
   var seconds = timespanSeconds(delay)
   var after = seconds > 0 ? durationText(seconds) : ""
-  if (!hasBattery) return "System delay: " + (after || "2 h (default)")
-  return "System policy: " + (after ? after + " or low battery" : "low battery")
+  if (!hasBattery) return "after " + (after || "2 h")
+  return after ? "after " + after + " or at low battery" : "at low battery"
+}
+
+// Where that comes from, for the line under it.
+function hibernateDelaySource(delay) {
+  return timespanSeconds(delay) > 0 ? "System setting" : "System default"
 }
 
 // The tooltip under it: what the line is, and where the delay is set.
@@ -268,10 +302,13 @@ if (typeof module !== "undefined") {
     clampToBounds: clampToBounds,
     firstTimeout: firstTimeout,
     durationText: durationText,
+    nextStageText: nextStageText,
+    boundsReason: boundsReason,
     summaryText: summaryText,
     timespanSeconds: timespanSeconds,
     hibernateDelayText: hibernateDelayText,
     hibernateDelayHint: hibernateDelayHint,
+    hibernateDelaySource: hibernateDelaySource,
     systemdBool: systemdBool,
     isObject: isObject,
     STAGE_KEYS: STAGE_KEYS,

@@ -93,3 +93,8 @@ Titles are never changed once cited from another file.
 **Decision.** Under the "Then hibernate" switch the panel shows when systemd will hibernate, read from `systemd-analyze cat-config systemd/sleep.conf` (`HibernateDelaySec=`, `HibernateOnACPower=`) and whether there is a battery. Changing it is documented in the README as a root drop-in.
 **Why.** Kike could not see after how long it hibernates. The plugin runs as the user and the logind call takes no delay.
 **Alternative rejected.** A stepper writing the drop-in through a root prompt: a plugin writing `/etc`, likely refused by the marketplace security review.
+
+## 2026-10-23 · The panel explains itself
+**Decision.** The schedule line says what fires next ("Next: Screensaver after 2 min idle") with "Times count from your last activity" under the stops; suspend and hibernate rows say what they do when on; switch tooltips say when turning one on turns the other off; minutes fields show their range and the stage limiting it; the footer notes that apps can delay idle actions and when hibernation is unavailable; run-now tooltips say they work while paused. The then-hibernate row reads "Then hibernate after 2 h" with "System default" or "System setting" under it.
+**Why.** Kike found the plugin's information scarce. Astra (gpt-6-astra) ranked what a user cannot learn from the panel; Kike asked for it where better, and for "Then hibernate after".
+**Alternative rejected.** An "Idle for 8 min" countdown: the panel opening is activity, so it would never show. Naming the inhibiting app: the service does not know it. Replacing the hero's stage count with "Automatic stages on": the count says more.

@@ -35,11 +35,11 @@ Panel {
     { key: "standby", glyph: "󰶐", number: 2, nowKey: "o", hint: "Monitors off (DPMS); a key or the mouse brings them back" }
   ]
   readonly property var systemStages: [
-    { key: "lock", glyph: "󰌾", number: 3, nowKey: "k", hint: "Lock screen; the backlight drops 5 s later" },
-    { key: "suspend", glyph: "󰒲", number: 4, nowKey: "s", hint: "Suspend through logind; the session locks first" }
+    { key: "lock", glyph: "󰌾", number: 3, nowKey: "k", hint: "Locks the session" },
+    { key: "suspend", glyph: "󰒲", number: 4, nowKey: "s", hint: "Suspend through logind; the session locks first", caption: "Locks, then suspends" }
   ]
   readonly property var hibernationStages: [
-    { key: "hibernate", glyph: "󰜗", number: 5, nowKey: "h", hint: "Hibernate through logind; the session locks first" }
+    { key: "hibernate", glyph: "󰜗", number: 5, nowKey: "h", hint: "Hibernate through logind; the session locks first", caption: "Locks, then saves the session to disk" }
   ]
   // Hibernation is listed only where logind says it can hibernate.
   readonly property bool canHibernate: ready && svc.canHibernate
@@ -62,6 +62,7 @@ Panel {
   readonly property bool canThenHibernate: ready && svc.canSuspendThenHibernate
   readonly property string hibernateDelayText: ready ? svc.hibernateDelayText : ""
   readonly property string hibernateDelayHint: ready ? svc.hibernateDelayHint : ""
+  readonly property string hibernateDelaySource: ready ? svc.hibernateDelaySource : ""
   readonly property bool showThenHibernate: thenHibernate || canThenHibernate
   function toggleThenHibernate() { if (ready) svc.setSuspendThenHibernate(!thenHibernate) }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
@@ -86,17 +87,32 @@ Panel {
   readonly property string summary: ready ? IdleModel.summaryText(stageList) : "Service not running"
 
   readonly property int stagesOn: stageList.filter(function(stage) { return stage.enabled }).length
-  // Above the schedule; empty while it runs normally, since the dots say it all.
+  // Above the schedule: an exception when there is one, else what fires next.
   readonly property string scheduleStatus: {
     if (!ready) return "Service not running"
     if (svc.orderNote !== "") return svc.orderNote
     if (svc.suspendOverridden) return "Suspend is off while Hibernate is on"
     if (svc.stockIdleEnabled) return "Paused while omarchy.idle is on. Run: omarchy plugin disable omarchy.idle"
-    if (stayAwake) return "Paused. t resumes"
+    if (stayAwake) return "Stay awake is on. Press t to resume."
     if (svc.standbyActive) return "Displays in standby"
     if (svc.screensaverWindowCount > 0) return "Screensaver running"
     if (stagesOn === 0) return "All stages off"
-    return ""
+    return IdleModel.nextStageText(stageList)
+  }
+
+  // Tooltip of a minutes field: its range and, when a neighbour sets it, why.
+  function minutesHint(key) {
+    var range = minutesRange(key)
+    var reason = ready ? IdleModel.boundsReason(key, svc.stageStates()) : ""
+    return "Allowed: " + range.from + "–" + range.to + " min." + (reason ? " " + reason + "." : "")
+  }
+
+  // Tooltip of a stage switch: what turning it on also does, else what it is.
+  function switchHint(entry) {
+    var other = IdleModel.exclusiveWith(entry.key)
+    if (other !== "" && !stageEnabled(entry.key) && stageEnabled(other))
+      return "Turn on " + IdleModel.stageLabel(entry.key) + " and turn off " + IdleModel.stageLabel(other)
+    return entry.hint
   }
 
   // Minutes a stage's field may take: its group neighbour's time while both are
@@ -183,7 +199,7 @@ Panel {
 
       PanelToolTip {
         visible: runMouse.containsMouse
-        text: IdleModel.stageLabel(row.key) + " now (" + row.modelData.nowKey + ")"
+        text: IdleModel.stageLabel(row.key) + " now (" + row.modelData.nowKey + ")" + (root.powerSaving ? "" : ". Works while paused.")
         fontFamily: root.fontFamily
       }
     }
@@ -210,16 +226,29 @@ Panel {
         }
       }
 
-      Text {
-        text: row.modelData.number + "  " + IdleModel.stageLabel(row.key)
-        color: row.isOn ? root.foreground : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        font.bold: row.isOn
-        elide: Text.ElideRight
+      Column {
         Layout.fillWidth: true
         Layout.maximumWidth: implicitWidth
         Layout.minimumWidth: implicitWidth
+        spacing: Style.space(1)
+
+        Text {
+          text: row.modelData.number + "  " + IdleModel.stageLabel(row.key)
+          color: row.isOn ? root.foreground : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          font.bold: row.isOn
+        }
+
+        // What the stage does, for the two that put the machine to sleep.
+        Text {
+          visible: row.isOn && !!row.modelData.caption
+          textFormat: Text.PlainText
+          text: row.modelData.caption || ""
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+        }
       }
 
       KeyCap { label: row.modelData.nowKey }
@@ -239,6 +268,12 @@ Panel {
         Accessible.name: IdleModel.stageLabel(row.key) + " idle minutes"
         // A refused write (out of order by the time it lands) puts the saved value back.
         onCommitted: function(v) { if (!root.setStageMinutes(row.key, v)) minutesField.value = row.minutes }
+
+        PanelToolTip {
+          visible: minutesField.hovering
+          text: root.minutesHint(row.key)
+          fontFamily: root.fontFamily
+        }
       }
 
       ToggleSwitch {
@@ -250,7 +285,7 @@ Panel {
 
         PanelToolTip {
           visible: stageSwitch.containsMouse
-          text: row.modelData.hint
+          text: root.switchHint(row.modelData)
           fontFamily: root.fontFamily
         }
       }
@@ -278,16 +313,19 @@ Panel {
         spacing: Style.space(2)
 
         Text {
-          text: "Then hibernate"
+          width: parent.width
+          textFormat: Text.PlainText
+          text: "Then hibernate" + (root.canThenHibernate ? " " + root.hibernateDelayText : "")
           color: root.thenHibernate && root.stageEnabled("suspend") ? root.foreground : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
+          elide: Text.ElideRight
         }
 
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: root.canThenHibernate ? root.hibernateDelayText : "Unavailable; suspends instead"
+          text: root.canThenHibernate ? root.hibernateDelaySource : "Unavailable; suspends instead"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -476,6 +514,7 @@ Panel {
             width: parent.width
             stages: root.stageList
             status: root.scheduleStatus
+            caption: "Times count from your last activity"
             available: root.ready
             foreground: root.foreground
             accent: root.accent
@@ -528,6 +567,45 @@ Panel {
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
+                  }
+                }
+              }
+            }
+
+            // Things the panel cannot show as a state, with the detail on hover.
+            Flow {
+              width: parent.width
+              spacing: Style.space(6)
+              topPadding: Style.space(4)
+
+              Repeater {
+                model: [
+                  { show: true, text: "Apps can delay idle actions",
+                    hint: "Apps that request idle inhibition, such as video players, can keep the screen on." },
+                  { show: root.ready && !root.canHibernate, text: "Hibernation unavailable",
+                    hint: "The system does not currently offer hibernation. Setup: omarchy-hibernation-setup" }
+                ].filter(function(note) { return note.show })
+                delegate: Text {
+                  id: footerNote
+                  required property var modelData
+                  rightPadding: Style.space(8)
+                  textFormat: Text.PlainText
+                  text: "󰋽 " + footerNote.modelData.text
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+
+                  MouseArea {
+                    id: noteMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                  }
+
+                  PanelToolTip {
+                    visible: noteMouse.containsMouse
+                    text: footerNote.modelData.hint
+                    fontFamily: root.fontFamily
                   }
                 }
               }

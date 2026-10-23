@@ -85,11 +85,14 @@ Bar icon:
 Panel:
 
 - The schedule at the top shows the stages in the order they fire, by
-  timeout. A stage that is on is a filled dot, one that is off is a ring with
+  timeout, and the line above it says what fires next ("Next: Screensaver
+  after 2 min idle") or why nothing will (paused, all off). A stage that is on is a filled dot, one that is off is a ring with
   its time struck through. Stages that are on and the line between them use
   the theme accent. Clicking a dot switches that stage on or off.
 - Each stage row has a minutes stepper and a switch. Click the stepper and
   type the minutes; Enter applies them, the −/+ buttons and Up/Down step.
+  Hovering a stepper shows its allowed range and, when another stage limits
+  it, which one.
 - Clicking the icon or the name of a stage runs that stage immediately. The
   key beside the name does the same.
 - The switch at the top toggles stay awake.
@@ -181,9 +184,9 @@ Then hibernate:
 - A switch under the suspend row. Suspend goes through logind's
   `SuspendThenHibernate`: the machine suspends, then wakes and hibernates
   when systemd decides. Useful on a laptop left on battery.
-- When it hibernates is set by systemd, not by the plugin, and the panel
-  shows it under the switch ("System delay: 2 h (default)", "System policy:
-  45 min or low battery"). It is the time after suspending, not after going
+- When it hibernates is set by systemd, not by the plugin, and the row says
+  it: "Then hibernate after 2 h" (system default), "Then hibernate after
+  45 min or at low battery". It is the time after suspending, not after going
   idle, and not a guaranteed deadline. Without a battery: after `HibernateDelaySec=`,
   2 h when unset. With a battery: at low battery, or after
   `HibernateDelaySec=` if that comes first (`HibernateOnACPower=no` runs the
@@ -202,6 +205,21 @@ Then hibernate:
 
 All timeouts count from the moment you went idle. Starting the
 screensaver or locking does not push the later stages back.
+
+## Troubleshooting
+
+- **Nothing happens when idle.** An app holding an idle inhibitor (a video
+  player, a call) keeps standby, suspend and hibernate from firing. The
+  panel cannot tell which app; `systemd-inhibit --list` and the app's own
+  settings can.
+- **No Hibernation section.** logind does not offer hibernation on this
+  system: no swap big enough, no `resume=` on the kernel command line, or
+  Secure Boot lockdown. On Omarchy, `omarchy-hibernation-setup` sets it up.
+- **A minutes field stops taking digits.** The time would break the order
+  within a group (lock no later than suspend or hibernate, screensaver no
+  later than standby). Hover the field for the allowed range.
+- **Suspend switched itself off.** Hibernate was switched on; only one of the
+  two can be on.
 
 ## Configuration
 

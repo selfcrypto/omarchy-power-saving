@@ -17,6 +17,8 @@ Rectangle {
   property var stages: []
   // One line above the stops; empty hides it.
   property string status: ""
+  // One quiet line under the stops; empty hides it.
+  property string caption: ""
   property bool available: true
   property color foreground: Commons.Color.popups.text
   property color accent: Commons.Color.accent
@@ -180,6 +182,18 @@ Rectangle {
         font.family: root.fontFamily
         font.pixelSize: Style.font.icon
       }
+    }
+
+    Text {
+      visible: root.caption !== ""
+      width: parent.width
+      textFormat: Text.PlainText
+      text: root.caption
+      color: root.secondary
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      horizontalAlignment: Text.AlignHCenter
+      wrapMode: Text.WordWrap
     }
   }
 }

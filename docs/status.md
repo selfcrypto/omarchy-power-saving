@@ -29,7 +29,7 @@ Budget 15 KB.
 
 5. Branch `suspend-then-hibernate` (not pushed): the lock fix, a Hibernate stage exclusive with suspend,
    a "Then hibernate" switch with systemd's delay shown read-only. IPC checked live before the delay
-   line; the panel with the switch not yet seen. Astra's information review (2026-10-23) given to Kike. No real hibernate tested yet: it writes RAM to
+   line; the information additions (Astra's review) not yet loaded in the shell. No real hibernate tested yet: it writes RAM to
    the swapfile on the NVMe, only with Kike's go-ahead after closing what is open. Releases as 1.6.0
    after #12622 is approved.
 

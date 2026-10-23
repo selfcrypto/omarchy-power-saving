@@ -112,6 +112,7 @@ Item {
   property bool hasBattery: false
   readonly property string hibernateDelayText: IdleModel.hibernateDelayText(hibernateDelay, hasBattery)
   readonly property string hibernateDelayHint: IdleModel.hibernateDelayHint(hibernateDelay, hasBattery, hibernateOnAC)
+  readonly property string hibernateDelaySource: IdleModel.hibernateDelaySource(hibernateDelay)
   // Suspend and hibernate are exclusive (IdleModel.EXCLUSIVE). Both on in
   // shell.json by hand: hibernate wins and suspend counts as off.
   readonly property bool suspendOverridden: suspendEnabled && hibernateEnabled && canHibernate

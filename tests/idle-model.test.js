@@ -97,10 +97,25 @@ test("systemd booleans", () => {
 })
 
 test("the then-hibernate delay line", () => {
-  assert.strictEqual(M.hibernateDelayText("", false), "System delay: 2 h (default)")
-  assert.strictEqual(M.hibernateDelayText("45min", false), "System delay: 45 min")
-  assert.strictEqual(M.hibernateDelayText("45min", true), "System policy: 45 min or low battery")
-  assert.strictEqual(M.hibernateDelayText("", true), "System policy: low battery")
+  assert.strictEqual(M.hibernateDelayText("", false), "after 2 h")
+  assert.strictEqual(M.hibernateDelayText("45min", false), "after 45 min")
+  assert.strictEqual(M.hibernateDelayText("45min", true), "after 45 min or at low battery")
+  assert.strictEqual(M.hibernateDelayText("", true), "at low battery")
+  assert.strictEqual(M.hibernateDelaySource(""), "System default")
+  assert.strictEqual(M.hibernateDelaySource("45min"), "System setting")
   assert.ok(M.hibernateDelayHint("45min", true, false).endsWith("Delay starts after unplugging."))
   assert.ok(!M.hibernateDelayHint("45min", false, false).includes("unplugging"))
+})
+
+test("next stage", () => {
+  assert.strictEqual(M.nextStageText([{ key: "lock", enabled: true, seconds: 600 }, { key: "screensaver", enabled: true, seconds: 120 }]), "Next: Screensaver after 2 min idle")
+  assert.strictEqual(M.nextStageText([{ key: "lock", enabled: false, seconds: 600 }]), "")
+})
+
+test("why a time is bounded", () => {
+  const s = Object.assign(states([true, 300], [true, 600], [true, 900], [true, 1200]), { hibernate: { enabled: false, seconds: 3600 } })
+  assert.strictEqual(M.boundsReason("screensaver", s), "Screensaver cannot follow Standby")
+  assert.strictEqual(M.boundsReason("suspend", s), "Suspend cannot come before Lock")
+  assert.strictEqual(M.boundsReason("lock", s), "Lock cannot follow Suspend")
+  assert.strictEqual(M.boundsReason("hibernate", s), "")
 })
