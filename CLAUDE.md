@@ -1,7 +1,7 @@
-# omarchy-power-saving · Omarchy shell plugin with four idle stages
+# omarchy-power-saving · Omarchy shell plugin with five idle stages
 
 Bar widget and service for the Omarchy shell (Quickshell, QML): screensaver, monitor standby,
-lock and suspend, each with its own switch and idle timeout. Published on the Omarchy plugin
+lock, suspend and hibernate, each with its own switch and idle timeout. Published on the Omarchy plugin
 marketplace as `io.github.selfcrypto.power-saving` and installed on Kike's desktop, where it
 replaces the stock `omarchy.idle` service. A broken `Service.qml` means no lock and no suspend.
 
@@ -31,7 +31,7 @@ index). Procedures: `docs/runbooks/`. Reader-facing: `README.md`.
 ## Rules that apply everywhere
 
 - Colors and sizes come from `qs.Commons` (`Commons.Color`, `Style`); nothing hard-coded.
-- Panel keys must keep working: `t`, `1`-`4`, `r` and `o` (both on release), `k`, `s`.
+- Panel keys must keep working: `t`, `1`-`5`, `r` and `o` (both on release), `k`, `s`, `h`.
 - Within a group the earlier stage never fires after the later one while both are on (`IdleModel.js` `timeoutBounds`).
 - No em dashes and no filler in code, docs, manifest, commits or issues.
 - Nothing is pushed, tagged or filed on the marketplace without asking first.

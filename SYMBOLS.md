@@ -5,7 +5,7 @@ One section per file: its first doc line, then each top-level symbol with its li
 
 <!-- repo-docs v3 roots=. 2026-10-23 -->
 
-## IdleModel.js (278 lines)
+## IdleModel.js (211 lines)
 Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - function secondsFromConfig L4
 - function boolFromConfig L10
@@ -13,27 +13,19 @@ Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - function screensaverWindowsAfter L25
 - const STAGES L59: Firing order within a group is the panel's order (see GROUP_ORDER).
 - const STAGE_LABELS L61
-- function isStage L68
-- function stageLabel L72
-- const GROUP_ORDER L79: are allowed. Only stages that are on are held to it.
-- function timeoutBounds L83: { key: { enabled, seconds } }: { min, max }, max -1 when there is no limit.
-- function clampToBounds L99: written by hand below it.
-- function firstTimeout L108: disabled then, so the value never fires).
-- function durationText L115
-- function summaryText L127: firing order; "All stages off" when nothing is armed.
-- const SLEEP_MODES L141: method for each.
-- const SLEEP_METHODS L142
-- const SLEEP_LABELS L143
-- function sleepModeFromConfig L145
-- function nextSleepMode L151: plain suspend always is.
-- const TIMESPAN_UNITS L160
-- function timespanSeconds L171: -1 when it is empty or not understood.
-- function hibernateWhenText L190: first; with neither, after 2 h.
-- function isObject L200
-- const STAGE_KEYS L204
-- function barEntrySettings L208: without the id; {} when the entry is absent, so reads fall back.
-- function mergedStageConfig L227: A key missing from both stays missing so Service.qml's defaults apply.
-- function stageSettingsFor L239: key currently in effect, so the first write migrates the idle block.
+- function isStage L69
+- function stageLabel L73
+- const GROUP_ORDER L80: are allowed. Only stages that are on are held to it.
+- function timeoutBounds L84: { key: { enabled, seconds } }: { min, max }, max -1 when there is no limit.
+- function clampToBounds L100: written by hand below it.
+- function firstTimeout L109: disabled then, so the value never fires).
+- function durationText L116
+- function summaryText L128: firing order; "All stages off" when nothing is armed.
+- function isObject L140
+- const STAGE_KEYS L144
+- function barEntrySettings L148: without the id; {} when the entry is absent, so reads fall back.
+- function mergedStageConfig L167: A key missing from both stays missing so Service.qml's defaults apply.
+- function stageSettingsFor L179: key currently in effect, so the first write migrates the idle block.
 
 ## IdleSchedule.qml (172 lines)
 The stages in the order they fire: one stop per stage, sorted by timeout,
@@ -70,197 +62,192 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (532 lines)
+## Panel.qml (462 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
-- property svc L25
-- property ready L26
-- property stayAwake L27
-- property powerSaving L28
-- property displayStages L32: `nowKey` runs it at once, as a click on the row's name does.
-- property systemStages L36
-- property stages L40
-- function stageEnabled L42
-- function stageSeconds L43
-- function stageMinutes L44
-- function setStageEnabled L45
-- function setStageMinutes L46
-- function toggleStage L47
-- property suspendMode L50: logind can do them; a mode set before it went away stays shown.
-- property sleepModesAvailable L51
-- property hibernateWhen L52
-- property sleepModeOptions L53
-- property showSleepModes L61
-- function setSuspendMode L62
-- function nextSuspendMode L63
-- function togglePowerSaving L64
-- function lockNow L65
-- function suspendNow L66
-- function screensaverNow L67
-- function standbyNow L68
-- function runStageNow L69
-- property stageList L76
-- property summary L84
-- property stagesOn L86
-- property scheduleStatus L88: Above the schedule; empty while it runs normally, since the dots say it all.
-- function minutesRange L102: minute, or out of order by hand, is shown as it is and not clamped.
-- property foreground L111
-- property accent L112
-- property urgent L113
-- property dim L114
-- property fontFamily L115
-- property hoverFill L116
-- component KeyCap L128: A key as printed on the keyboard, for the keys the panel answers to.
-- component StageRow L151: glyph-and-name part is a button that runs the stage at once.
-- component SleepModeRow L260: (HibernateDelaySec=), shown here and set only by root.
-- component StageGroup L312
+- property svc L26
+- property ready L27
+- property stayAwake L28
+- property powerSaving L29
+- property displayStages L33: `nowKey` runs it at once, as a click on the row's name does.
+- property systemStages L37
+- property hibernationStages L41
+- property canHibernate L45: Hibernation is listed only where logind says it can hibernate.
+- property stages L46
+- function stageEnabled L48
+- function stageSeconds L49
+- function stageMinutes L50
+- function setStageEnabled L51
+- function setStageMinutes L52
+- function toggleStage L53
+- function togglePowerSaving L54
+- function lockNow L55
+- function suspendNow L56
+- function hibernateNow L57
+- function screensaverNow L58
+- function standbyNow L59
+- function runStageNow L60
+- property stageList L68
+- property summary L76
+- property stagesOn L78
+- property scheduleStatus L80: Above the schedule; empty while it runs normally, since the dots say it all.
+- function minutesRange L94: minute, or out of order by hand, is shown as it is and not clamped.
+- property foreground L103
+- property accent L104
+- property urgent L105
+- property dim L106
+- property fontFamily L107
+- property hoverFill L108
+- component KeyCap L120: A key as printed on the keyboard, for the keys the panel answers to.
+- component StageRow L143: glyph-and-name part is a button that runs the stage at once.
+- component StageGroup L249
 
-## Service.qml (1282 lines)
-Power-saving idle service in four stages, each with its own switch and
-- property shell L57: Injected by omarchy-shell (the service loader).
-- property home L59
-- property stayAwakeStateDir L60
-- property stayAwakeStatePath L61
-- property togglesDir L62
-- property defaultScreensaverSeconds L63
-- property defaultLockSeconds L64
-- property defaultStandbySeconds L65
-- property defaultSuspendSeconds L66
-- property minTimeoutSeconds L67
-- property pluginId L68
-- property shellConfigPath L69
-- property fileConfig L76: the host itself does is what makes a panel edit take effect at once.
-- property idleConfig L80: on 4.0.3+). Read-only here: the fallback for keys the bar entry lacks.
-- property entrySettings L84: This plugin's own settings, inline on its bar entry in the layout.
-- property stageConfig L86
-- property screensaverTimeoutSeconds L87
-- property lockTimeoutSeconds L88
-- property standbyTimeoutSeconds L89
-- property suspendTimeoutSeconds L90
-- property lockEnabled L91
-- property standbyEnabled L92
-- property suspendEnabled L93
-- property suspendMode L97: at that moment falls back to plain suspend.
-- property screensaverEnabled L98
-- property firstIdleTimeoutSeconds L99
-- property screensaverDelaySeconds L100
-- property lockDelaySeconds L101
-- property stockIdleEnabled L107: is the tick).
-- property idleEnabled L112
-- property cycleEnabled L113
-- property standbyArmed L114
-- property suspendArmed L115
-- property screensaverClass L116
-- property cycleMonitor L117
-- property standbyMonitor L118
-- property suspendMonitor L119
-- property watchMonitor L120
-- property cycleIdle L121
-- property standbyIdle L122
-- property suspendIdle L123
-- property watchIdle L124
-- property stayAwake L126
-- property stayAwakeStateLoaded L127
-- property hasPendingStayAwakePersist L128
-- property pendingStayAwakePersist L129
-- property screensaverOff L130
-- property screensaverToggleLoaded L131
-- property idledThisCycle L132
-- property screensaverStartedThisCycle L133
-- property awaySince L137: section below.
-- property away L138
-- property cycleDoneThisAway L139
-- property standbyFiredThisAway L140
-- property suspendFiredThisAway L141
-- property standbyActive L142
-- property autoDisabledStockIdle L143
-- property lastEvent L144
-- property lastEventAt L145
-- property lastStandbyAt L146
-- property lastSuspendAt L147
-- property canHibernate L152: suspend-then-hibernate hibernates, as text.
-- property canSuspendThenHibernate L153
-- property hibernateDelay L154
-- property hasBattery L155
-- property hibernateProbeResult L156
-- property hibernateWhen L157
-- property orderNote L160: the panel shows it for a few seconds.
-- property screensaverWindows L161
-- property screensaverWindowCount L162
-- function secondsFromConfig L164
-- function nowIso L168
-- function logEvent L172
-- function runProcess L179
-- property displaysOnCheck L205: cannot be read the screensaver launches as it always did.
-- property screensaverSkippedExitCode L206
-- function launchScreensaver L208
-- function startScreensaver L220: when one is running, and its windows are already tracked.
-- function handleScreensaverLaunchExit L226
-- function endIdleCycle L236: ignored because idledThisCycle is already false.
-- function lockSystem L245
-- function startIdleCycle L253
-- function cancelIdleCycle L276
-- function resetScreensaverWindows L293
-- function setScreensaverWindow L299
-- function handleScreensaverWindowOpened L306
-- function handleScreensaverWindowClosed L312
-- function eventParts L321
-- function handleHyprlandEvent L325
-- property watchIdleSeconds L359: itself only exits on a key press or on losing focus.
-- property ownActionRunning L360
-- property ownActionRecent L362
-- function markOwnAction L364
-- function syncWatchMonitor L370
-- function enterAway L375
-- function endAway L385: Ends the away state without treating it as the user coming back.
-- function noteIdle L399: gone that long. Standby and suspend are (re)scheduled from awaySince.
-- function scheduleAwayStage L405
-- function fireAwayStandby L416
-- function fireAwaySuspend L422
-- function stopScreensaver L428
-- function userReturned L435
-- function handleInput L446
-- function handleActivity L452: A monitor reported activity: `source` is its stage.
-- function handleIdleChanged L467
-- function handleWatchIdleChanged L480
-- property dpmsOffCommand L506: it a no-op.
-- property dpmsOnCommand L507
-- property screensaverStopCommand L532: it turns the monitors off.
-- function standbyDisplays L534
-- function wakeDisplays L547
-- function handleStandbyIdleChanged L553
-- property logindCall L570: stays suspended is systemd's HibernateDelaySec=, which only root can set.
-- property suspendCommand L571
-- property hibernateProbeCommand L578
-- function refreshHibernate L585: set up or removed while the shell runs.
-- function applyHibernateProbeLine L591
-- function applyHibernateProbe L597
-- property sleepModesAvailable L606: { mode: bool } for IdleModel.nextSleepMode and the panel.
-- function setSuspendMode L612
-- function suspendSystem L618
-- function handleSuspendIdleChanged L639
-- function stageEnabled L650
-- function stageTimeout L658
-- function stageJson L666
-- function statusJson L670
-- function mutateIdleConfig L740: `shell.barConfig`, which is what re-arms the monitors.
-- function stageStates L754: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
-- function stageTimeoutBounds L765: that is off has no neighbour limit; it is moved into range when turned on.
-- function setStageTimeout L770
-- function timeoutWhenEnabled L780: that keeps it in order with the other stage of its group.
-- function noteMoved L788: Tells the panel a stage was moved; called only once the write went through.
-- function setStageEnabled L793
-- function setGatedStage L830: a second write would start from config that has not reloaded yet.
-- function persistStayAwake L840
-- function refreshStayAwakeState L855
-- function applyShellConfigText L859
-- function refreshScreensaverToggle L869
-- function applyScreensaverOff L873
-- function applyStayAwake L881
-- function handleStockIdle L908: this one stays paused instead of fighting them for the setting.
-- function setIdleEnabled L924
-- function armMonitor L955
-- function syncMonitors L972
+## Service.qml (1283 lines)
+Power-saving idle service in five stages, each with its own switch and
+- property shell L59: Injected by omarchy-shell (the service loader).
+- property home L61
+- property stayAwakeStateDir L62
+- property stayAwakeStatePath L63
+- property togglesDir L64
+- property defaultScreensaverSeconds L65
+- property defaultLockSeconds L66
+- property defaultStandbySeconds L67
+- property defaultSuspendSeconds L68
+- property defaultHibernateSeconds L69
+- property minTimeoutSeconds L70
+- property pluginId L71
+- property shellConfigPath L72
+- property fileConfig L79: the host itself does is what makes a panel edit take effect at once.
+- property idleConfig L83: on 4.0.3+). Read-only here: the fallback for keys the bar entry lacks.
+- property entrySettings L87: This plugin's own settings, inline on its bar entry in the layout.
+- property stageConfig L89
+- property screensaverTimeoutSeconds L90
+- property lockTimeoutSeconds L91
+- property standbyTimeoutSeconds L92
+- property suspendTimeoutSeconds L93
+- property hibernateTimeoutSeconds L94
+- property lockEnabled L95
+- property standbyEnabled L96
+- property suspendEnabled L97
+- property hibernateEnabled L98
+- property canHibernate L100: logind's CanHibernate answer: hibernation set up (swap, resume=) and allowed.
+- property screensaverEnabled L101
+- property firstIdleTimeoutSeconds L102
+- property screensaverDelaySeconds L103
+- property lockDelaySeconds L104
+- property stockIdleEnabled L110: is the tick).
+- property idleEnabled L115
+- property cycleEnabled L116
+- property standbyArmed L117
+- property suspendArmed L118
+- property hibernateArmed L119
+- property screensaverClass L120
+- property cycleMonitor L121
+- property standbyMonitor L122
+- property suspendMonitor L123
+- property hibernateMonitor L124
+- property watchMonitor L125
+- property cycleIdle L126
+- property standbyIdle L127
+- property suspendIdle L128
+- property hibernateIdle L129
+- property watchIdle L130
+- property stayAwake L132
+- property stayAwakeStateLoaded L133
+- property hasPendingStayAwakePersist L134
+- property pendingStayAwakePersist L135
+- property screensaverOff L136
+- property screensaverToggleLoaded L137
+- property idledThisCycle L138
+- property screensaverStartedThisCycle L139
+- property awaySince L143: section below.
+- property away L144
+- property cycleDoneThisAway L145
+- property standbyFiredThisAway L146
+- property suspendFiredThisAway L147
+- property hibernateFiredThisAway L148
+- property standbyActive L149
+- property autoDisabledStockIdle L150
+- property lastEvent L151
+- property lastEventAt L152
+- property lastStandbyAt L153
+- property lastSuspendAt L154
+- property orderNote L157: the panel shows it for a few seconds.
+- property screensaverWindows L158
+- property screensaverWindowCount L159
+- function secondsFromConfig L161
+- function nowIso L165
+- function logEvent L169
+- function runProcess L176
+- property displaysOnCheck L202: cannot be read the screensaver launches as it always did.
+- property screensaverSkippedExitCode L203
+- function launchScreensaver L205
+- function startScreensaver L217: when one is running, and its windows are already tracked.
+- function handleScreensaverLaunchExit L223
+- function endIdleCycle L233: ignored because idledThisCycle is already false.
+- function lockSystem L242
+- function startIdleCycle L250
+- function cancelIdleCycle L273
+- function resetScreensaverWindows L290
+- function setScreensaverWindow L296
+- function handleScreensaverWindowOpened L303
+- function handleScreensaverWindowClosed L309
+- function eventParts L318
+- function handleHyprlandEvent L322
+- property watchIdleSeconds L356: itself only exits on a key press or on losing focus.
+- property ownActionRunning L357
+- property ownActionRecent L359
+- function markOwnAction L361
+- function syncWatchMonitor L367
+- function enterAway L372
+- function endAway L383: Ends the away state without treating it as the user coming back.
+- function noteIdle L400: awaySince.
+- function scheduleAwayStages L405
+- function scheduleAwayStage L411
+- function fireAwayStandby L422
+- function fireAwaySuspend L428
+- function fireAwayHibernate L434
+- function stopScreensaver L440
+- function userReturned L447
+- function handleInput L458
+- function handleActivity L464: A monitor reported activity: `source` is its stage.
+- function handleIdleChanged L479
+- function handleWatchIdleChanged L492
+- property dpmsOffCommand L518: it a no-op.
+- property dpmsOnCommand L519
+- property screensaverStopCommand L544: it turns the monitors off.
+- function standbyDisplays L546
+- function wakeDisplays L559
+- function handleStandbyIdleChanged L565
+- property logindCall L579: Hibernate is the same path with logind's Hibernate call.
+- function suspendSystem L581
+- function hibernateSystem L585
+- function sleepSystem L589
+- function refreshHibernate L612: set up or removed while the shell runs.
+- function handleHibernateIdleChanged L616
+- function handleSuspendIdleChanged L625
+- function stageEnabled L636
+- function stageTimeout L645
+- function stageJson L654
+- function statusJson L658
+- function mutateIdleConfig L726: `shell.barConfig`, which is what re-arms the monitors.
+- function stageStates L740: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
+- function stageTimeoutBounds L751: that is off has no neighbour limit; it is moved into range when turned on.
+- function setStageTimeout L756
+- function timeoutWhenEnabled L766: that keeps it in order with the other stage of its group.
+- function noteMoved L774: Tells the panel a stage was moved; called only once the write went through.
+- function setStageEnabled L779
+- function setGatedStage L820: a second write would start from config that has not reloaded yet.
+- function persistStayAwake L830
+- function refreshStayAwakeState L845
+- function applyShellConfigText L849
+- function refreshScreensaverToggle L859
+- function applyScreensaverOff L863
+- function applyStayAwake L871
+- function handleStockIdle L898: this one stays paused instead of fighting them for the setting.
+- function setIdleEnabled L914
+- function armMonitor L946
+- function syncMonitors L963
 
-## tests/idle-model.test.js (95 lines)
+## tests/idle-model.test.js (69 lines)
 Stage order within a group: `node --test tests/`.
 - function states L6

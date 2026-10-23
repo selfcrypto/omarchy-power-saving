@@ -56,13 +56,14 @@ function screensaverWindowsAfter(windows, address, visible) {
 // ---------------------------------------------------------------- stages
 
 // Firing order within a group is the panel's order (see GROUP_ORDER).
-var STAGES = ["screensaver", "standby", "lock", "suspend"]
+var STAGES = ["screensaver", "standby", "lock", "suspend", "hibernate"]
 
 var STAGE_LABELS = {
   screensaver: "Screensaver",
   standby: "Standby",
   lock: "Lock",
-  suspend: "Suspend"
+  suspend: "Suspend",
+  hibernate: "Hibernate"
 }
 
 function isStage(name) {
@@ -134,74 +135,13 @@ function summaryText(stages) {
   return parts.join(" → ")
 }
 
-// ------------------------------------------------------------- hibernate
-
-// What the suspend stage asks of logind, by systemctl verb, and the logind
-// method for each.
-var SLEEP_MODES = ["suspend", "suspend-then-hibernate", "hibernate"]
-var SLEEP_METHODS = { suspend: "Suspend", "suspend-then-hibernate": "SuspendThenHibernate", hibernate: "Hibernate" }
-var SLEEP_LABELS = { suspend: "Suspend", "suspend-then-hibernate": "Then hibernate", hibernate: "Hibernate" }
-
-function sleepModeFromConfig(value) {
-  return SLEEP_MODES.indexOf(String(value)) !== -1 ? String(value) : "suspend"
-}
-
-// The mode after `mode` among those `available` ({ mode: bool }) has on;
-// plain suspend always is.
-function nextSleepMode(mode, available) {
-  var at = SLEEP_MODES.indexOf(mode)
-  for (var step = 1; step <= SLEEP_MODES.length; step++) {
-    var next = SLEEP_MODES[(at + step) % SLEEP_MODES.length]
-    if (next === "suspend" || (available && available[next])) return next
-  }
-  return "suspend"
-}
-
-var TIMESPAN_UNITS = {
-  us: 0.000001, usec: 0.000001, ms: 0.001, msec: 0.001,
-  s: 1, sec: 1, second: 1, seconds: 1,
-  m: 60, min: 60, minute: 60, minutes: 60,
-  h: 3600, hr: 3600, hour: 3600, hours: 3600,
-  d: 86400, day: 86400, days: 86400,
-  w: 604800, week: 604800, weeks: 604800
-}
-
-// Seconds in a systemd time span ("2h", "1h 30min", "90"; systemd.time(7)),
-// -1 when it is empty or not understood.
-function timespanSeconds(text) {
-  var rest = String(text || "").trim()
-  if (rest === "") return -1
-  var total = 0
-  var re = /^(\d+(?:\.\d+)?)\s*([a-z]*)\s*/
-  while (rest !== "") {
-    var m = re.exec(rest)
-    if (!m) return -1
-    var unit = m[2] === "" ? 1 : TIMESPAN_UNITS[m[2]]
-    if (unit === undefined) return -1
-    total += Number(m[1]) * unit
-    rest = rest.slice(m[0].length)
-  }
-  return Math.floor(total)
-}
-
-// When suspend-then-hibernate hibernates (systemd-sleep.conf(5)): after
-// HibernateDelaySec= when set, at 5% battery on a battery, whichever comes
-// first; with neither, after 2 h.
-function hibernateWhenText(delay, hasBattery) {
-  var seconds = timespanSeconds(delay)
-  var after = seconds > 0 ? "after " + durationText(seconds) : ""
-  if (after && hasBattery) return after + " or at 5% battery"
-  if (after) return after
-  return hasBattery ? "at 5% battery" : "after 2 h"
-}
-
 // ---------------------------------------------------------------- config
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "suspendMode"]
+var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "hibernate", "hibernateEnabled"]
 
 // Inline settings of one bar entry (`{ id, ...settings }` in bar.layout.*),
 // without the id; {} when the entry is absent, so reads fall back.
@@ -262,13 +202,6 @@ if (typeof module !== "undefined") {
     firstTimeout: firstTimeout,
     durationText: durationText,
     summaryText: summaryText,
-    timespanSeconds: timespanSeconds,
-    hibernateWhenText: hibernateWhenText,
-    SLEEP_MODES: SLEEP_MODES,
-    SLEEP_METHODS: SLEEP_METHODS,
-    SLEEP_LABELS: SLEEP_LABELS,
-    sleepModeFromConfig: sleepModeFromConfig,
-    nextSleepMode: nextSleepMode,
     isObject: isObject,
     STAGE_KEYS: STAGE_KEYS,
     barEntrySettings: barEntrySettings,

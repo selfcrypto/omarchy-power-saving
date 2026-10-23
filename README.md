@@ -1,6 +1,6 @@
 # Omarchy Power Saving
 
-Idle power saving for [Omarchy](https://omarchy.org) in four stages:
+Idle power saving for [Omarchy](https://omarchy.org) in five stages:
 
 | Group | Stage | What it does |
 |---|---|---|
@@ -8,6 +8,7 @@ Idle power saving for [Omarchy](https://omarchy.org) in four stages:
 | Display | Standby | Turns the monitors off (DPMS) |
 | System | Lock | Locks the session |
 | System | Suspend | Suspends the machine |
+| Hibernation | Hibernate | Hibernates the machine |
 
 Each stage has its own switch and its own idle timeout. Both are set from a
 panel in the bar.
@@ -78,7 +79,7 @@ supported yet.
 Bar icon:
 
 - Left click opens the panel.
-- Right click toggles stay awake, which pauses all four stages. It is the same
+- Right click toggles stay awake, which pauses all the stages. It is the same
   flag as `omarchy toggle idle` and the coffee cup indicator.
 
 Panel:
@@ -107,12 +108,12 @@ Keys in the panel:
 | Key | Action |
 |---|---|
 | `t` | Toggle stay awake |
-| `1` to `4` | Switch a stage on or off |
+| `1` to `5` | Switch a stage on or off |
 | `r` | Screensaver now |
 | `o` | Standby now |
 | `k` | Lock now |
 | `s` | Suspend now |
-| `h` | Next suspend mode (when hibernation is available) |
+| `h` | Hibernate now |
 
 Keys in a minutes stepper, once it has been clicked:
 
@@ -163,22 +164,18 @@ Suspend:
 - Goes through logind and needs no privileges.
 - Idle inhibitors are respected.
 
-Suspend mode, chosen under the suspend row:
+Hibernate:
 
-- Suspend: logind's `Suspend`, the default.
-- Then hibernate: logind's `SuspendThenHibernate`. The machine suspends,
-  wakes on an RTC alarm and hibernates. Useful on a laptop left on battery.
-  When it hibernates is systemd's setting, shown under the choice:
-  `HibernateDelaySec=` in `/etc/systemd/sleep.conf.d/` (root). Unset, a
-  machine with a battery hibernates at 5% battery and one without after 2 h.
-- Hibernate: logind's `Hibernate`. Memory is written to disk and the machine
-  powers off.
-- The two hibernate modes are shown only when logind can do them, which needs
-  hibernation set up (on Omarchy: `omarchy-hibernation-setup`). If
-  hibernation has gone by the time the stage fires, the machine suspends.
-- Applies to "suspend now" as well.
+- Shown only when logind can hibernate, which needs hibernation set up (on
+  Omarchy: `omarchy-hibernation-setup`).
+- Locks the session first and turns the monitors back on, as suspend does.
+- Goes through logind's `Hibernate` call and needs no privileges.
+- Idle inhibitors are respected.
+- Its timeout counts from the moment you went idle, like the others. With
+  suspend on and an earlier time, the machine is asleep when the hibernate
+  time comes, so it does not hibernate.
 
-All four timeouts count from the moment you went idle. Starting the
+All timeouts count from the moment you went idle. Starting the
 screensaver or locking does not push the later stages back.
 
 ## Configuration
@@ -199,9 +196,11 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
   "standby": 600,
   "lock": 1200,
   "suspend": 1800,
+  "hibernate": 3600,
   "lockEnabled": false,
   "standbyEnabled": true,
-  "suspendEnabled": true
+  "suspendEnabled": true,
+  "hibernateEnabled": false
 }
 ```
 
@@ -211,10 +210,11 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
 | `standby` | Seconds of idle before the monitors turn off | 600 |
 | `lock` | Seconds of idle before the session locks | 300 |
 | `suspend` | Seconds of idle before the machine suspends | 1800 |
+| `hibernate` | Seconds of idle before the machine hibernates | 3600 |
 | `standbyEnabled` | Standby stage on or off | `false` |
 | `lockEnabled` | Lock stage on or off | `true` |
 | `suspendEnabled` | Suspend stage on or off | `false` |
-| `suspendMode` | `suspend`, `suspend-then-hibernate` or `hibernate` | `suspend` |
+| `hibernateEnabled` | Hibernate stage on or off | `false` |
 
 The minimum timeout is 10 seconds. The panel and the IPC `timeout` call keep
 the order within a group described above; values written to `shell.json` by
@@ -243,13 +243,12 @@ omarchy-shell idle screensaver                  # screensaver now
 omarchy-shell idle standby                      # monitors off now
 omarchy-shell idle wake                         # monitors on now
 omarchy-shell idle suspend                      # suspend now
-omarchy-shell idle suspendMode hibernate        # suspend | suspend-then-hibernate | hibernate
-omarchy-shell idle suspendMode ""               # print the current mode
+omarchy-shell idle hibernate                    # hibernate now
 omarchy-shell idle enable | disable | toggle    # stay awake, as in the stock service
 ```
 
-Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock` and
-`suspend`.
+Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock`,
+`suspend` and `hibernate`.
 
 ## Requirements
 
@@ -271,7 +270,7 @@ Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock` and
 - Activity reported while the service starts or closes the screensaver,
   locks or turns the monitors off, and for 1.5 seconds after, is taken to be
   that action and is ignored.
-- Your return is detected by a fourth idle monitor with a 0.1 second timeout
+- Your return is detected by its own idle monitor with a 0.1 second timeout
   that ignores idle inhibitors. It is armed while you are away and while a
   screensaver is up. This is also what ends the screensaver on a mouse move.
 - That monitor only reports the step from idle to active. For input that

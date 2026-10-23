@@ -7,9 +7,10 @@ import qs.Ui
 import "IdleModel.js" as IdleModel
 
 // Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
-// that draws the four idle stages in the order they fire (IdleSchedule.qml),
-// then lists them in their two groups, display (screensaver, standby) and
-// system (lock, suspend), each with a switch and a minutes stepper. All state
+// that draws the idle stages in the order they fire (IdleSchedule.qml), then
+// lists them in their groups, display (screensaver, standby), system (lock,
+// suspend) and hibernation (where logind can hibernate), each with a switch
+// and a minutes stepper. All state
 // lives in Service.qml, which the shell loads once; this widget exists once
 // per monitor and only reads from and calls into that service, so the copies
 // never disagree.
@@ -37,7 +38,12 @@ Panel {
     { key: "lock", glyph: "󰌾", number: 3, nowKey: "k", hint: "Lock screen; the backlight drops 5 s later" },
     { key: "suspend", glyph: "󰒲", number: 4, nowKey: "s", hint: "Suspend through logind; the session locks first" }
   ]
-  readonly property var stages: displayStages.concat(systemStages)
+  readonly property var hibernationStages: [
+    { key: "hibernate", glyph: "󰜗", number: 5, nowKey: "h", hint: "Hibernate through logind; the session locks first" }
+  ]
+  // Hibernation is listed only where logind says it can hibernate.
+  readonly property bool canHibernate: ready && svc.canHibernate
+  readonly property var stages: displayStages.concat(systemStages, canHibernate ? hibernationStages : [])
 
   function stageEnabled(key) { return ready ? svc.stageEnabled(key) : false }
   function stageSeconds(key) { return ready ? svc.stageTimeout(key) : 0 }
@@ -45,25 +51,10 @@ Panel {
   function setStageEnabled(key, value) { if (ready) svc.setStageEnabled(key, value) }
   function setStageMinutes(key, minutes) { return ready && svc.setStageTimeout(key, Math.max(1, minutes) * 60) }
   function toggleStage(key) { setStageEnabled(key, !stageEnabled(key)) }
-  // What the suspend stage does. The hibernate modes are offered only where
-  // logind can do them; a mode set before it went away stays shown.
-  readonly property string suspendMode: ready ? svc.suspendMode : "suspend"
-  readonly property var sleepModesAvailable: ready ? svc.sleepModesAvailable : ({ "suspend": true })
-  readonly property string hibernateWhen: ready ? svc.hibernateWhen : ""
-  readonly property var sleepModeOptions: {
-    var list = []
-    for (var i = 0; i < IdleModel.SLEEP_MODES.length; i++) {
-      var mode = IdleModel.SLEEP_MODES[i]
-      if (sleepModesAvailable[mode] || mode === suspendMode) list.push({ value: mode, label: IdleModel.SLEEP_LABELS[mode] })
-    }
-    return list
-  }
-  readonly property bool showSleepModes: sleepModeOptions.length > 1
-  function setSuspendMode(mode) { if (ready) svc.setSuspendMode(mode) }
-  function nextSuspendMode() { if (showSleepModes) setSuspendMode(IdleModel.nextSleepMode(suspendMode, sleepModesAvailable)) }
   function togglePowerSaving() { if (ready) svc.setIdleEnabled(root.stayAwake) }
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
+  function hibernateNow() { if (!canHibernate) return; root.close(); svc.hibernateSystem("panel") }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
   function standbyNow() { if (!ready) return; root.close(); svc.standbyDisplays("panel") }
   function runStageNow(key) {
@@ -71,6 +62,7 @@ Panel {
     else if (key === "standby") standbyNow()
     else if (key === "lock") lockNow()
     else if (key === "suspend") suspendNow()
+    else if (key === "hibernate") hibernateNow()
   }
 
   readonly property var stageList: {
@@ -216,7 +208,7 @@ Panel {
         elide: Text.ElideRight
         Layout.fillWidth: true
         Layout.maximumWidth: implicitWidth
-        Layout.minimumWidth: Math.min(implicitWidth, Style.space(60))
+        Layout.minimumWidth: implicitWidth
       }
 
       KeyCap { label: row.modelData.nowKey }
@@ -254,67 +246,10 @@ Panel {
     }
   }
 
-  // Under the suspend row: what the stage does, suspend, suspend then
-  // hibernate, or hibernate. The suspend-then-hibernate delay is systemd's
-  // (HibernateDelaySec=), shown here and set only by root.
-  component SleepModeRow: Rectangle {
-    id: modeRow
-    width: parent ? parent.width : 0
-    height: modeColumn.implicitHeight + Style.space(10)
-    radius: Style.cornerRadius
-    color: "transparent"
-
-    Column {
-      id: modeColumn
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.leftMargin: Style.space(8) + Style.space(30) + Style.space(8)
-      anchors.rightMargin: Style.space(10)
-      spacing: Style.space(4)
-
-      RowLayout {
-        width: parent.width
-        spacing: Style.space(8)
-
-        ButtonGroup {
-          options: root.sleepModeOptions
-          value: root.suspendMode
-          focusable: false
-          spacing: Style.space(4)
-          foreground: root.foreground
-          accent: root.accent
-          fontFamily: root.fontFamily
-          fontSize: Style.font.caption
-          onChanged: function(mode) { root.setSuspendMode(mode) }
-        }
-
-        Item { Layout.fillWidth: true }
-
-        KeyCap { label: "h" }
-      }
-
-      Text {
-        visible: root.suspendMode !== "suspend"
-        width: parent.width
-        textFormat: Text.PlainText
-        text: !root.sleepModesAvailable[root.suspendMode] ? "Not available here; suspends instead"
-          : (root.suspendMode === "hibernate" ? "Saves memory to disk and powers off"
-          : "Hibernates " + root.hibernateWhen + " (systemd HibernateDelaySec=)")
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-        wrapMode: Text.WordWrap
-      }
-    }
-  }
-
   component StageGroup: Column {
     id: group
     required property string title
     required property var entries
-    // Shown at the bottom of the group's card, when set.
-    property Component footer: null
     width: parent ? parent.width : 0
     spacing: Style.space(6)
 
@@ -338,18 +273,8 @@ Panel {
           model: group.entries
           delegate: StageRow {}
         }
-        Loader {
-          width: parent.width
-          active: group.footer !== null
-          sourceComponent: group.footer
-        }
       }
     }
-  }
-
-  Component {
-    id: sleepModeRowComponent
-    SleepModeRow {}
   }
 
   BarIconButton {
@@ -411,7 +336,7 @@ Panel {
         else if (t === "o" || t === "O" || t === "r" || t === "R") keyCatcher.pendingKey = t.toLowerCase()
         else if (t === "k" || t === "K") root.lockNow()
         else if (t === "s" || t === "S") root.suspendNow()
-        else if ((t === "h" || t === "H") && root.showSleepModes) root.nextSuspendMode()
+        else if ((t === "h" || t === "H") && root.canHibernate) root.hibernateNow()
         else return
         event.accepted = true
       }
@@ -442,7 +367,7 @@ Panel {
             width: parent.width
             title: "Power saving"
             meta: !root.ready ? "Unavailable"
-              : (root.stayAwake ? "Staying awake" : (!root.powerSaving ? "Paused" : root.stagesOn + " of 4 stages on"))
+              : (root.stayAwake ? "Staying awake" : (!root.powerSaving ? "Paused" : root.stagesOn + " of " + root.stages.length + " stages on"))
             foreground: root.foreground
             fontFamily: root.fontFamily
             iconComponent: Component {
@@ -489,7 +414,12 @@ Panel {
           StageGroup {
             title: "System"
             entries: root.systemStages
-            footer: root.showSleepModes ? sleepModeRowComponent : null
+          }
+
+          StageGroup {
+            visible: root.canHibernate
+            title: "Hibernation"
+            entries: root.hibernationStages
           }
 
           PanelSeparator { width: parent.width; foreground: root.foreground }
@@ -504,7 +434,7 @@ Panel {
               spacing: Style.space(6)
 
               Repeater {
-                model: [{ key: "t", text: "stay awake" }, { key: "1–4", text: "stage on/off" }, { key: "click", text: "a name runs it" }]
+                model: [{ key: "t", text: "stay awake" }, { key: "1–" + root.stages.length, text: "stage on/off" }, { key: "click", text: "a name runs it" }]
                 delegate: Row {
                   id: hint
                   required property var modelData

@@ -5,10 +5,11 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "IdleModel.js" as IdleModel
 
-// Power-saving idle service in four stages, each with its own switch and
+// Power-saving idle service in five stages, each with its own switch and
 // timeout, grouped the way they are presented in the panel:
-//   display: screensaver → standby (monitors off, DPMS)
-//   system:  lock → suspend
+//   display:     screensaver → standby (monitors off, DPMS)
+//   system:      lock → suspend
+//   hibernation: hibernate (only where logind can)
 // Derived from Omarchy's omarchy.idle service, which only knows screensaver +
 // lock and has no way to switch either off, and extended; Panel.qml is the bar
 // widget that drives it. It replaces omarchy.idle: the manifest declares it a
@@ -35,16 +36,17 @@ import "IdleModel.js" as IdleModel
 // (`shell.idleConfig`), so an older install migrates on its first write:
 //   screensaver / lock / suspend   seconds since idle began (stock keys)
 //   standby                        seconds since idle began (ours)
-//   lockEnabled / suspendEnabled / standbyEnabled
-//                                  booleans (defaults: true / false / false)
+//   hibernate                      seconds since idle began (ours)
+//   lockEnabled / suspendEnabled / standbyEnabled / hibernateEnabled
+//                                  booleans (defaults: true / false / false / false)
 // The screensaver switch is Omarchy's own `screensaver-off` toggle
 // (`omarchy toggle screensaver`), so the menu and the panel agree. "Stay
-// awake" (`omarchy toggle idle`) pauses all four stages.
+// awake" (`omarchy toggle idle`) pauses all the stages.
 //
 // Screensaver and lock share one IdleMonitor armed at the earliest enabled
 // deadline and are staggered with timers, exactly as upstream does, because
 // locking ends that cycle (the lock plugin owns the screen from then on).
-// Standby and suspend get an IdleMonitor each, so each can be the first to
+// Standby, suspend and hibernate get an IdleMonitor each, so each can be the first to
 // see the user go idle. Once that is known they run on timers counted from
 // that moment (see the away section), because the compositor resets the
 // monitors whenever this service opens or closes the screensaver or locks.
@@ -64,6 +66,7 @@ Item {
   readonly property int defaultLockSeconds: 300
   readonly property int defaultStandbySeconds: 600
   readonly property int defaultSuspendSeconds: 1800
+  readonly property int defaultHibernateSeconds: 3600
   readonly property int minTimeoutSeconds: 10
   readonly property string pluginId: "io.github.selfcrypto.power-saving"
   readonly property string shellConfigPath: home + "/.config/omarchy/shell.json"
@@ -88,13 +91,13 @@ Item {
   readonly property int lockTimeoutSeconds: secondsFromConfig(stageConfig.lock, defaultLockSeconds)
   readonly property int standbyTimeoutSeconds: secondsFromConfig(stageConfig.standby, defaultStandbySeconds)
   readonly property int suspendTimeoutSeconds: secondsFromConfig(stageConfig.suspend, defaultSuspendSeconds)
+  readonly property int hibernateTimeoutSeconds: secondsFromConfig(stageConfig.hibernate, defaultHibernateSeconds)
   readonly property bool lockEnabled: IdleModel.boolFromConfig(stageConfig.lockEnabled, true)
   readonly property bool standbyEnabled: IdleModel.boolFromConfig(stageConfig.standbyEnabled, false)
   readonly property bool suspendEnabled: IdleModel.boolFromConfig(stageConfig.suspendEnabled, false)
-  // What the suspend stage does: "suspend", "suspend-then-hibernate" or
-  // "hibernate" (IdleModel.SLEEP_MODES). A hibernate mode logind cannot do
-  // at that moment falls back to plain suspend.
-  readonly property string suspendMode: IdleModel.sleepModeFromConfig(stageConfig.suspendMode)
+  readonly property bool hibernateEnabled: IdleModel.boolFromConfig(stageConfig.hibernateEnabled, false)
+  // logind's CanHibernate answer: hibernation set up (swap, resume=) and allowed.
+  property bool canHibernate: false
   readonly property bool screensaverEnabled: screensaverToggleLoaded && !screensaverOff
   readonly property int firstIdleTimeoutSeconds: IdleModel.firstTimeout(screensaverEnabled, screensaverTimeoutSeconds, lockEnabled, lockTimeoutSeconds)
   readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
@@ -113,14 +116,17 @@ Item {
   readonly property bool cycleEnabled: idleEnabled && (screensaverEnabled || lockEnabled)
   readonly property bool standbyArmed: idleEnabled && standbyEnabled
   readonly property bool suspendArmed: idleEnabled && suspendEnabled
+  readonly property bool hibernateArmed: idleEnabled && hibernateEnabled && canHibernate
   readonly property string screensaverClass: "org.omarchy.screensaver"
   property var cycleMonitor: null
   property var standbyMonitor: null
   property var suspendMonitor: null
+  property var hibernateMonitor: null
   property var watchMonitor: null
   readonly property bool cycleIdle: cycleMonitor ? cycleMonitor.isIdle : false
   readonly property bool standbyIdle: standbyMonitor ? standbyMonitor.isIdle : false
   readonly property bool suspendIdle: suspendMonitor ? suspendMonitor.isIdle : false
+  readonly property bool hibernateIdle: hibernateMonitor ? hibernateMonitor.isIdle : false
   readonly property bool watchIdle: watchMonitor ? watchMonitor.isIdle : false
 
   property bool stayAwake: false
@@ -139,22 +145,13 @@ Item {
   property bool cycleDoneThisAway: false
   property bool standbyFiredThisAway: false
   property bool suspendFiredThisAway: false
+  property bool hibernateFiredThisAway: false
   property bool standbyActive: false
   property bool autoDisabledStockIdle: false
   property string lastEvent: "starting"
   property string lastEventAt: ""
   property string lastStandbyAt: ""
   property string lastSuspendAt: ""
-  // From the hibernate probe: logind's CanHibernate and
-  // CanSuspendThenHibernate answers, the configured HibernateDelaySec= (""
-  // when unset) and whether there is a battery. hibernateWhen is when
-  // suspend-then-hibernate hibernates, as text.
-  property bool canHibernate: false
-  property bool canSuspendThenHibernate: false
-  property string hibernateDelay: ""
-  property bool hasBattery: false
-  property var hibernateProbeResult: ({})
-  readonly property string hibernateWhen: IdleModel.hibernateWhenText(hibernateDelay, hasBattery)
   // Set when turning a stage on moved its timeout to keep the group order;
   // the panel shows it for a few seconds.
   property string orderNote: ""
@@ -377,6 +374,7 @@ Item {
     root.cycleDoneThisAway = false
     root.standbyFiredThisAway = false
     root.suspendFiredThisAway = false
+    root.hibernateFiredThisAway = false
     logEvent("away", "idle since " + new Date(since).toISOString())
     syncWatchMonitor()
   }
@@ -389,17 +387,25 @@ Item {
     root.cycleDoneThisAway = false
     root.standbyFiredThisAway = false
     root.suspendFiredThisAway = false
+    root.hibernateFiredThisAway = false
     standbyAwayTimer.stop()
     suspendAwayTimer.stop()
+    hibernateAwayTimer.stop()
     syncWatchMonitor()
   }
 
   // A stage monitor went idle: `seconds` is its timeout, so the user has been
-  // gone that long. Standby and suspend are (re)scheduled from awaySince.
+  // gone that long. Standby, suspend and hibernate are (re)scheduled from
+  // awaySince.
   function noteIdle(seconds) {
     if (!root.away) enterAway(Date.now() - seconds * 1000)
+    scheduleAwayStages()
+  }
+
+  function scheduleAwayStages() {
     scheduleAwayStage(standbyAwayTimer, root.standbyArmed && !root.standbyFiredThisAway, root.standbyTimeoutSeconds)
     scheduleAwayStage(suspendAwayTimer, root.suspendArmed && !root.suspendFiredThisAway, root.suspendTimeoutSeconds)
+    scheduleAwayStage(hibernateAwayTimer, root.hibernateArmed && !root.hibernateFiredThisAway, root.hibernateTimeoutSeconds)
   }
 
   function scheduleAwayStage(timer, wanted, seconds) {
@@ -423,6 +429,12 @@ Item {
     if (!root.away || !root.suspendArmed || root.suspendFiredThisAway) return
     root.suspendFiredThisAway = true
     suspendSystem("suspend-timeout")
+  }
+
+  function fireAwayHibernate() {
+    if (!root.away || !root.hibernateArmed || root.hibernateFiredThisAway) return
+    root.hibernateFiredThisAway = true
+    hibernateSystem("hibernate-timeout")
   }
 
   function stopScreensaver(reason) {
@@ -563,60 +575,19 @@ Item {
 
   // Suspend is asked of logind directly: the org.freedesktop.login1 Suspend
   // call, which is what Omarchy's own Suspend menu entry ends up making too.
-  // The other modes call Hibernate or SuspendThenHibernate instead, asked
-  // again at the moment of the call, so a system where hibernation has gone
-  // since the last probe still suspends. How long suspend-then-hibernate
-  // stays suspended is systemd's HibernateDelaySec=, which only root can set.
+  // Hibernate is the same path with logind's Hibernate call.
   readonly property string logindCall: "busctl call org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager"
-  readonly property string suspendCommand: {
-    var method = IdleModel.SLEEP_METHODS[root.suspendMode]
-    var plain = root.logindCall + " Suspend b true"
-    if (method === "Suspend") return plain
-    return "if [ \"$(" + root.logindCall + " Can" + method + ")\" = 's \"yes\"' ]; then "
-      + root.logindCall + " " + method + " b true; else " + plain + "; fi"
-  }
-  readonly property string hibernateProbeCommand: root.logindCall + " CanHibernate 2>/dev/null | sed -n 's/^s \"\\(.*\\)\"$/hibernate=\\1/p'; "
-    + root.logindCall + " CanSuspendThenHibernate 2>/dev/null | sed -n 's/^s \"\\(.*\\)\"$/then=\\1/p'; "
-    + "systemd-analyze cat-config systemd/sleep.conf 2>/dev/null | sed -n 's/^[[:space:]]*HibernateDelaySec=[[:space:]]*/delay=/p' | tail -n 1; "
-    + "for t in /sys/class/power_supply/*/type; do [ \"$(cat \"$t\" 2>/dev/null)\" = Battery ] && { echo battery=yes; break; }; done; true"
-
-  // Asked at start and each time the panel opens, since hibernation can be
-  // set up or removed while the shell runs.
-  function refreshHibernate() {
-    if (hibernateProbe.running) return
-    root.hibernateProbeResult = ({})
-    hibernateProbe.running = true
-  }
-
-  function applyHibernateProbeLine(line) {
-    var text = String(line)
-    var at = text.indexOf("=")
-    if (at > 0) root.hibernateProbeResult[text.slice(0, at)] = text.slice(at + 1).trim()
-  }
-
-  function applyHibernateProbe() {
-    var result = root.hibernateProbeResult
-    root.canHibernate = result.hibernate === "yes"
-    root.canSuspendThenHibernate = result.then === "yes"
-    root.hibernateDelay = result.delay || ""
-    root.hasBattery = result.battery === "yes"
-  }
-
-  // { mode: bool } for IdleModel.nextSleepMode and the panel.
-  readonly property var sleepModesAvailable: ({
-    "suspend": true,
-    "suspend-then-hibernate": root.canSuspendThenHibernate,
-    "hibernate": root.canHibernate
-  })
-
-  function setSuspendMode(mode) {
-    if (IdleModel.SLEEP_MODES.indexOf(String(mode)) === -1) return false
-    if (root.suspendMode === mode) return true
-    return mutateIdleConfig("suspendMode=" + mode, function(idle) { idle.suspendMode = mode })
-  }
 
   function suspendSystem(reason) {
-    logEvent("suspend-system", reason || "requested")
+    sleepSystem("suspend", "Suspend", suspendProcess, reason)
+  }
+
+  function hibernateSystem(reason) {
+    sleepSystem("hibernate", "Hibernate", hibernateProcess, reason)
+  }
+
+  function sleepSystem(label, method, process, reason) {
+    logEvent(label + "-system", reason || "requested")
     root.lastSuspendAt = nowIso()
     // Resume must not land on monitors this service left in DPMS off: the
     // machine would look dead until something happened to poke them.
@@ -632,8 +603,23 @@ Item {
     // lands in the log either way.
     endIdleCycle()
     // Whatever idle time there is after the resume counts from scratch.
-    endAway("suspend")
-    runProcess(suspendProcess, "suspend", "omarchy-system-lock; " + root.suspendCommand)
+    endAway(label)
+    runProcess(process, label, "omarchy-system-lock; " + root.logindCall + " " + method + " b true")
+  }
+
+  // Asked at start and each time the panel opens, since hibernation can be
+  // set up or removed while the shell runs.
+  function refreshHibernate() {
+    if (!hibernateProbe.running) hibernateProbe.running = true
+  }
+
+  function handleHibernateIdleChanged() {
+    logEvent("hibernate-monitor", root.hibernateIdle ? "idle" : "active")
+    if (!root.hibernateIdle) {
+      handleActivity("hibernate")
+      return
+    }
+    if (root.hibernateArmed) noteIdle(root.hibernateTimeoutSeconds)
   }
 
   function handleSuspendIdleChanged() {
@@ -652,6 +638,7 @@ Item {
     if (name === "standby") return root.standbyEnabled
     if (name === "lock") return root.lockEnabled
     if (name === "suspend") return root.suspendEnabled
+    if (name === "hibernate") return root.hibernateEnabled
     return false
   }
 
@@ -660,6 +647,7 @@ Item {
     if (name === "standby") return root.standbyTimeoutSeconds
     if (name === "lock") return root.lockTimeoutSeconds
     if (name === "suspend") return root.suspendTimeoutSeconds
+    if (name === "hibernate") return root.hibernateTimeoutSeconds
     return 0
   }
 
@@ -678,15 +666,10 @@ Item {
         screensaver: stageJson("screensaver"),
         standby: stageJson("standby"),
         lock: stageJson("lock"),
-        suspend: stageJson("suspend")
+        suspend: stageJson("suspend"),
+        hibernate: stageJson("hibernate")
       },
-      suspendMode: {
-        mode: root.suspendMode,
-        available: root.sleepModesAvailable,
-        hibernateDelay: root.hibernateDelay,
-        battery: root.hasBattery,
-        hibernateWhen: root.hibernateWhen
-      },
+      canHibernate: root.canHibernate,
       idle: root.cycleIdle,
       standbyIdle: root.standbyIdle,
       standbyActive: root.standbyActive,
@@ -707,6 +690,8 @@ Item {
         standbyTimeout: root.standbyMonitor ? root.standbyMonitor.timeout : null,
         suspend: root.suspendMonitor !== null,
         suspendTimeout: root.suspendMonitor ? root.suspendMonitor.timeout : null,
+        hibernate: root.hibernateMonitor !== null,
+        hibernateTimeout: root.hibernateMonitor ? root.hibernateMonitor.timeout : null,
         watch: root.watchMonitor !== null
       },
       timers: {
@@ -720,7 +705,8 @@ Item {
         wake: wakeProcess.running,
         standbyOff: standbyOffProcess.running,
         standbyOn: standbyOnProcess.running,
-        suspend: suspendProcess.running
+        suspend: suspendProcess.running,
+        hibernate: hibernateProcess.running
       },
       lastStandbyAt: root.lastStandbyAt,
       lastSuspendAt: root.lastSuspendAt,
@@ -822,10 +808,14 @@ Item {
       if (root.suspendEnabled === enabled) return true
       return setGatedStage("suspend", enabled)
     }
+    if (name === "hibernate") {
+      if (root.hibernateEnabled === enabled) return true
+      return setGatedStage("hibernate", enabled)
+    }
     return false
   }
 
-  // Standby, lock and suspend: switch and timeout in one config write, since
+  // Standby, lock, suspend and hibernate: switch and timeout in one config write, since
   // a second write would start from config that has not reloaded yet.
   function setGatedStage(name, enabled) {
     var seconds = enabled ? timeoutWhenEnabled(name) : stageTimeout(name)
@@ -939,7 +929,7 @@ Item {
     id: monitorComponent
 
     IdleMonitor {
-      // "cycle" (screensaver + lock), "standby", "suspend" or "watch" (the
+      // "cycle" (screensaver + lock), "standby", "suspend", "hibernate" or "watch" (the
       // user coming back, see the away section); "retired" once replaced so a
       // signal from a monitor awaiting deletion cannot reach a handler.
       property string stage: ""
@@ -947,6 +937,7 @@ Item {
         if (stage === "cycle") root.handleIdleChanged()
         else if (stage === "standby") root.handleStandbyIdleChanged()
         else if (stage === "suspend") root.handleSuspendIdleChanged()
+        else if (stage === "hibernate") root.handleHibernateIdleChanged()
         else if (stage === "watch") root.handleWatchIdleChanged()
       }
     }
@@ -976,21 +967,23 @@ Item {
     root.cycleMonitor = armMonitor(root.cycleMonitor, root.cycleEnabled, root.firstIdleTimeoutSeconds, "cycle")
     root.standbyMonitor = armMonitor(root.standbyMonitor, root.standbyArmed, root.standbyTimeoutSeconds, "standby")
     root.suspendMonitor = armMonitor(root.suspendMonitor, root.suspendArmed, root.suspendTimeoutSeconds, "suspend")
+    var previousHibernate = root.hibernateMonitor
+    root.hibernateMonitor = armMonitor(root.hibernateMonitor, root.hibernateArmed, root.hibernateTimeoutSeconds, "hibernate")
     // A cycle that was started by a monitor that no longer exists has nothing
     // to end it on activity; drop it and let the new monitor start afresh.
     if (root.idledThisCycle && root.cycleMonitor !== previousCycle) cancelIdleCycle("monitor-rearm")
     // The same goes for the away state when the cycle monitor changed, or
-    // when nothing is armed any more. A standby or suspend change alone keeps
-    // it and reschedules those two from awaySince: ending it left a running
-    // cycle behind, so input only closed the screensaver and the lock fired
-    // on the user later.
+    // when nothing is armed any more. A standby, suspend or hibernate change
+    // alone keeps it and reschedules those from awaySince: ending it left a
+    // running cycle behind, so input only closed the screensaver and the lock
+    // fired on the user later.
     if (root.cycleMonitor !== previousCycle
-      || (!root.cycleMonitor && !root.standbyMonitor && !root.suspendMonitor)) {
+      || (!root.cycleMonitor && !root.standbyMonitor && !root.suspendMonitor && !root.hibernateMonitor)) {
       endAway("monitor-rearm")
-    } else if (root.away && (root.standbyMonitor !== previousStandby || root.suspendMonitor !== previousSuspend)) {
+    } else if (root.away && (root.standbyMonitor !== previousStandby || root.suspendMonitor !== previousSuspend
+      || root.hibernateMonitor !== previousHibernate)) {
       logEvent("away-reschedule", "monitor-rearm")
-      scheduleAwayStage(standbyAwayTimer, root.standbyArmed && !root.standbyFiredThisAway, root.standbyTimeoutSeconds)
-      scheduleAwayStage(suspendAwayTimer, root.suspendArmed && !root.suspendFiredThisAway, root.suspendTimeoutSeconds)
+      scheduleAwayStages()
     }
   }
 
@@ -1005,6 +998,8 @@ Item {
   onStandbyTimeoutSecondsChanged: syncMonitors()
   onSuspendArmedChanged: syncMonitors()
   onSuspendTimeoutSecondsChanged: syncMonitors()
+  onHibernateArmedChanged: syncMonitors()
+  onHibernateTimeoutSecondsChanged: syncMonitors()
 
   Timer {
     id: orderNoteTimer
@@ -1065,6 +1060,12 @@ Item {
     onTriggered: root.fireAwaySuspend()
   }
 
+  Timer {
+    id: hibernateAwayTimer
+    repeat: false
+    onTriggered: root.fireAwayHibernate()
+  }
+
   Connections {
     target: Hyprland
     function onRawEvent(event) { root.handleHyprlandEvent(event) }
@@ -1120,12 +1121,15 @@ Item {
     onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "suspend exitCode=" + exitCode + " status=" + exitStatus) }
   }
   Process {
+    id: hibernateProcess
+    onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "hibernate exitCode=" + exitCode + " status=" + exitStatus) }
+  }
+  Process {
     id: hibernateProbe
-    command: ["bash", "-c", root.hibernateProbeCommand]
-    stdout: SplitParser {
-      onRead: function(line) { root.applyHibernateProbeLine(line) }
+    command: ["busctl", "call", "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "CanHibernate"]
+    stdout: StdioCollector {
+      onStreamFinished: root.canHibernate = String(text).trim() === "s \"yes\""
     }
-    onExited: function() { root.applyHibernateProbe() }
   }
 
   Process {
@@ -1228,7 +1232,7 @@ Item {
       return root.setIdleEnabled(!root.idleEnabled)
     }
 
-    // omarchy-shell idle stage <screensaver|standby|lock|suspend> [on|off|toggle|status]
+    // omarchy-shell idle stage <screensaver|standby|lock|suspend|hibernate> [on|off|toggle|status]
     function stage(name: string, action: string): string {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       var act = String(action || "status")
@@ -1238,7 +1242,7 @@ Item {
       return root.stageEnabled(name) ? "on" : "off"
     }
 
-    // omarchy-shell idle timeout <screensaver|standby|lock|suspend> [seconds]
+    // omarchy-shell idle timeout <screensaver|standby|lock|suspend|hibernate> [seconds]
     function timeout(name: string, seconds: string): string {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       if (String(seconds || "") === "") return String(root.stageTimeout(name))
@@ -1258,13 +1262,10 @@ Item {
       return "ok"
     }
 
-    // omarchy-shell idle suspendMode [suspend|suspend-then-hibernate|hibernate]
-    function suspendMode(mode: string): string {
-      var wanted = String(mode || "")
-      if (wanted === "") return root.suspendMode
-      if (IdleModel.SLEEP_MODES.indexOf(wanted) === -1) return "unknown mode: " + wanted
-      if (!root.setSuspendMode(wanted)) return "not written"
-      return root.sleepModesAvailable[wanted] ? "ok" : "ok (not available here, suspends instead)"
+    function hibernate(): string {
+      if (!root.canHibernate) return "hibernation not available"
+      root.hibernateSystem("ipc")
+      return "ok"
     }
 
     // omarchy-shell idle standby  → monitors off now

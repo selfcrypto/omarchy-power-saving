@@ -55,41 +55,15 @@ test("summaryText lists stages that are on, in firing order", () => {
   assert.strictEqual(M.summaryText(list), "Screensaver 2 min → Lock 10 min")
 })
 
-test("systemd time spans", () => {
-  assert.strictEqual(M.timespanSeconds("2h"), 7200)
-  assert.strictEqual(M.timespanSeconds("1h 30min"), 5400)
-  assert.strictEqual(M.timespanSeconds("1h30min"), 5400)
-  assert.strictEqual(M.timespanSeconds("90"), 90)
-  assert.strictEqual(M.timespanSeconds("45 min"), 2700)
-  assert.strictEqual(M.timespanSeconds(""), -1)
-  assert.strictEqual(M.timespanSeconds("soon"), -1)
-  assert.strictEqual(M.timespanSeconds("2 fortnights"), -1)
+test("hibernate is a stage of its own group", () => {
+  assert.ok(M.isStage("hibernate"))
+  const s = Object.assign(states([true, 300], [true, 600], [true, 900], [true, 1200]), { hibernate: { enabled: true, seconds: 60 } })
+  assert.deepStrictEqual(M.timeoutBounds("hibernate", s, 10), { min: 10, max: -1 })
+  assert.deepStrictEqual(M.timeoutBounds("suspend", s, 10), { min: 900, max: -1 })
 })
 
-test("when suspend-then-hibernate hibernates", () => {
-  assert.strictEqual(M.hibernateWhenText("", false), "after 2 h")
-  assert.strictEqual(M.hibernateWhenText("", true), "at 5% battery")
-  assert.strictEqual(M.hibernateWhenText("45min", false), "after 45 min")
-  assert.strictEqual(M.hibernateWhenText("3h", true), "after 3 h or at 5% battery")
-  assert.strictEqual(M.hibernateWhenText("garbage", false), "after 2 h")
-})
-
-test("the suspend mode is carried on every write", () => {
-  const out = M.stageSettingsFor({}, { suspendMode: "hibernate" })
-  assert.strictEqual(out.suspendMode, "hibernate")
-})
-
-test("an unknown suspend mode is plain suspend", () => {
-  assert.strictEqual(M.sleepModeFromConfig("hibernate"), "hibernate")
-  assert.strictEqual(M.sleepModeFromConfig("hybrid-sleep"), "suspend")
-  assert.strictEqual(M.sleepModeFromConfig(undefined), "suspend")
-})
-
-test("the h key steps through the available modes only", () => {
-  const both = { "suspend-then-hibernate": true, hibernate: true }
-  assert.strictEqual(M.nextSleepMode("suspend", both), "suspend-then-hibernate")
-  assert.strictEqual(M.nextSleepMode("suspend-then-hibernate", both), "hibernate")
-  assert.strictEqual(M.nextSleepMode("hibernate", both), "suspend")
-  assert.strictEqual(M.nextSleepMode("suspend", { hibernate: true }), "hibernate")
-  assert.strictEqual(M.nextSleepMode("suspend", {}), "suspend")
+test("the hibernate keys are carried on every write", () => {
+  const out = M.stageSettingsFor({}, { hibernate: 3600, hibernateEnabled: true })
+  assert.strictEqual(out.hibernate, 3600)
+  assert.strictEqual(out.hibernateEnabled, true)
 })

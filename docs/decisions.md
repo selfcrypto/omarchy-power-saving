@@ -69,12 +69,12 @@ Titles are never changed once cited from another file.
 **Why.** Stay awake switching on while the screensaver was up (Claude's hooks did it every few minutes) cancelled the cycle and forgot windows that stayed on screen. Mouse movement then woke the monitors but left the screensaver, which only a key press closed. The next cycle's launch found it running and added nothing. Reported by Kike twice on 2026-10-22.
 **Alternative rejected.** Closing the screensaver when stay awake switches on: hides it from someone who is away for no reason the user caused.
 
-## 2026-10-23 · Suspend mode through logind, delay left to systemd
-**Decision.** The suspend stage has a mode: `suspend`, `suspend-then-hibernate` or `hibernate`, calling logind's method of that name. A hibernate mode is offered only when its `Can…` call answers `yes`, and the call checks again when the stage fires, falling back to `Suspend`. The panel shows when the machine hibernates, read from `HibernateDelaySec=` and the presence of a battery; the plugin never sets it.
-**Why.** Kike asked for hibernation after a time suspended, for laptops, then for plain hibernate as a choice too. logind already wakes on an RTC alarm and hibernates; the delay lives in `/etc/systemd/sleep.conf.d/`, root only, and the D-Bus call takes no delay.
-**Alternative rejected.** Own RTC wake (`rtcwake`, `/sys/class/rtc/*/wakealarm`): needs root. A delay setting in the plugin: it could not be applied.
-
 ## 2026-10-23 · A standby or suspend change keeps the away state
 **Decision.** When only the standby or suspend monitor is re-armed (switched or retimed), the away state is kept and those two stages are rescheduled from `awaySince`. The away state still ends when the cycle monitor changes or nothing is armed.
 **Why.** Ending it left the screensaver/lock cycle running with nothing to cancel it: input only closed the screensaver, and the lock fired minutes later while the user was at the machine. Seen on 2026-10-23 when the Claude hook switched suspend on during an idle cycle; any config write does the same.
 **Alternative rejected.** Cancelling the cycle with the away state: a config write while the user is away would put the lock back by a full cycle.
+
+## 2026-10-23 · Hibernate is a stage of its own
+**Decision.** Hibernate is a fifth stage in its own panel section, with switch, minutes stepper, key `5`, run-now key `h` and a schedule dot. It calls logind's `Hibernate` after locking, and is shown and armed only when `CanHibernate` answers `yes`. No order rule ties it to suspend.
+**Why.** Kike asked for hibernation as a section with the same rules as the others. A mode chooser under the suspend row (suspend / then hibernate / hibernate) was built first and rejected as looking botched.
+**Alternative rejected.** The mode chooser. Astra (gpt-6-astra) suggested putting Hibernate in the System section; Kike asked for its own section.
