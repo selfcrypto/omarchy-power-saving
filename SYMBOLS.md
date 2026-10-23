@@ -5,7 +5,7 @@ One section per file: its first doc line, then each top-level symbol with its li
 
 <!-- repo-docs v3 roots=. 2026-10-24 -->
 
-## IdleModel.js (317 lines)
+## IdleModel.js (331 lines)
 Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - function secondsFromConfig L4
 - function boolFromConfig L10
@@ -34,9 +34,10 @@ Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - const STAGE_KEYS L242
 - function barEntrySettings L246: without the id; {} when the entry is absent, so reads fall back.
 - function mergedStageConfig L265: A key missing from both stays missing so Service.qml's defaults apply.
-- function stageSettingsFor L277: key currently in effect, so the first write migrates the idle block.
+- function exclusiveSettings L280: while suspend is. Covers config edited by hand.
+- function stageSettingsFor L290
 
-## IdleSchedule.qml (199 lines)
+## IdleSchedule.qml (200 lines)
 The stages in the order they fire: one stop per stage, sorted by timeout,
 - property stages L17: when set, is a caption under the time.
 - property status L19: One line above the stops; empty hides it.
@@ -72,7 +73,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (619 lines)
+## Panel.qml (647 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L26
 - property ready L27
@@ -118,9 +119,9 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - component KeyCap L146: A key as printed on the keyboard, for the keys the panel answers to.
 - component StageRow L169: glyph-and-name part is a button that runs the stage at once.
 - component ThenHibernateRow L284: read-only, since the plugin cannot set it, and says how to on hover.
-- component StageGroup L353
+- component StageGroup L381
 
-## Service.qml (1400 lines)
+## Service.qml (1406 lines)
 Power-saving idle service in five stages, each with its own switch and
 - property shell L59: Injected by omarchy-shell (the service loader).
 - property home L61
@@ -261,14 +262,14 @@ Power-saving idle service in five stages, each with its own switch and
 - function stageJson L726
 - function statusJson L730
 - function mutateIdleConfig L806: `shell.barConfig`, which is what re-arms the monitors.
-- function stageStates L820: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
-- function stageTimeoutBounds L831: that is off has no neighbour limit; it is moved into range when turned on.
-- function setStageTimeout L836
-- function timeoutWhenEnabled L846: that keeps it in order with the other stage of its group.
-- function noteMoved L854: Tells the panel a stage was moved; called only once the write went through.
-- function note L858
-- function setStageEnabled L863
-- function setGatedStage L903: `extra`, when given, changes more keys in the same write.
+- function stageStates L821: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
+- function stageTimeoutBounds L832: that is off has no neighbour limit; it is moved into range when turned on.
+- function setStageTimeout L837
+- function timeoutWhenEnabled L847: that keeps it in order with the other stage of its group.
+- function noteMoved L855: Tells the panel a stage was moved; called only once the write went through.
+- function note L859
+- function setStageEnabled L864
+- function setGatedStage L905: `extra`, when given, changes more keys in the same write.
 - function persistStayAwake L923
 - function refreshStayAwakeState L938
 - function applyShellConfigText L942
@@ -280,6 +281,6 @@ Power-saving idle service in five stages, each with its own switch and
 - function armMonitor L1039
 - function syncMonitors L1056
 
-## tests/idle-model.test.js (121 lines)
+## tests/idle-model.test.js (137 lines)
 Stage order within a group: `node --test tests/`.
 - function states L6

@@ -274,6 +274,19 @@ function mergedStageConfig(entrySettings, idleConfig) {
 
 // What a write puts on the entry: whatever else it carries, plus every stage
 // key currently in effect, so the first write migrates the idle block.
+// Rules every config write keeps: suspend and hibernate are never both on
+// (hibernate wins where the system can hibernate), and then hibernate is off
+// while suspend is. Covers config edited by hand.
+function exclusiveSettings(settings, canHibernate) {
+  var suspendOn = boolFromConfig(settings.suspendEnabled, false)
+  if (suspendOn && canHibernate && boolFromConfig(settings.hibernateEnabled, false)) {
+    settings.suspendEnabled = false
+    suspendOn = false
+  }
+  if (!suspendOn && boolFromConfig(settings.suspendThenHibernate, false)) settings.suspendThenHibernate = false
+  return settings
+}
+
 function stageSettingsFor(entrySettings, stageConfig) {
   var out = {}
   for (var key in entrySettings || {}) out[key] = entrySettings[key]
@@ -297,6 +310,7 @@ if (typeof module !== "undefined") {
     GROUP_ORDER: GROUP_ORDER,
     EXCLUSIVE: EXCLUSIVE,
     exclusiveWith: exclusiveWith,
+    exclusiveSettings: exclusiveSettings,
     timeoutBounds: timeoutBounds,
     clampToBounds: clampToBounds,
     firstTimeout: firstTimeout,

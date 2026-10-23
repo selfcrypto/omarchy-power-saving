@@ -119,3 +119,19 @@ test("why a time is bounded", () => {
   assert.strictEqual(M.boundsReason("lock", s), "Lock cannot follow Suspend")
   assert.strictEqual(M.boundsReason("hibernate", s), "")
 })
+
+test("a config write never keeps suspend and hibernate both on", () => {
+  assert.deepStrictEqual(M.exclusiveSettings({ suspendEnabled: true, hibernateEnabled: true, suspendThenHibernate: true }, true),
+    { suspendEnabled: false, hibernateEnabled: true, suspendThenHibernate: false })
+  // Without hibernation, suspend stays on.
+  assert.deepStrictEqual(M.exclusiveSettings({ suspendEnabled: true, hibernateEnabled: true }, false),
+    { suspendEnabled: true, hibernateEnabled: true })
+})
+
+test("then hibernate goes off with suspend, string values included", () => {
+  assert.deepStrictEqual(M.exclusiveSettings({ suspendEnabled: "false", suspendThenHibernate: true }, true),
+    { suspendEnabled: "false", suspendThenHibernate: false })
+  assert.deepStrictEqual(M.exclusiveSettings({ suspendEnabled: true, suspendThenHibernate: true }, true),
+    { suspendEnabled: true, suspendThenHibernate: true })
+  assert.deepStrictEqual(M.exclusiveSettings({ hibernateEnabled: true }, true), { hibernateEnabled: true })
+})

@@ -141,15 +141,16 @@ Rectangle {
                 elide: Text.ElideRight
               }
 
+              // Wider than its cell: centred under the stop, kept inside the row.
               Text {
                 visible: !!stop.modelData.note
-                width: parent.width
+                width: Math.min(implicitWidth, stops.width)
+                x: Math.max(-stop.x, Math.min((parent.width - width) / 2, stops.width - stop.x - width))
                 textFormat: Text.PlainText
                 text: stop.modelData.note || ""
                 color: root.secondary
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
-                horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
               }
             }

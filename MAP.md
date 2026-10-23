@@ -8,6 +8,7 @@ grep it). This file says what each file is for and where to go for a kind of cha
 | What | Where | Also moves |
 |---|---|---|
 | When a stage fires, what it does | `Service.qml` (`syncMonitors`, `scheduleAwayStage`, `startIdleCycle`) | README "Behaviour" |
+| Suspend and hibernate never both on | `IdleModel.js` (`EXCLUSIVE`, `exclusiveSettings`), `Service.qml` (`mutateIdleConfig`, `setGatedStage`) | `tests/idle-model.test.js` |
 | Which stage times are allowed | `IdleModel.js` (`GROUP_ORDER`, `timeoutBounds`), `Service.qml` (`setStageTimeout`, `timeoutWhenEnabled`) | `tests/idle-model.test.js`, README "Order within a group" |
 | Switching a stage on or off | `Service.qml` (`setStageEnabled`, `setGatedStage`) | |
 | Config keys and their defaults | `Service.qml` (`default*Seconds`), `IdleModel.js` (`STAGE_KEYS`, `mergedStageConfig`) | README "Configuration" |

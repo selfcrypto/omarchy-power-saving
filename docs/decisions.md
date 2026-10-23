@@ -98,3 +98,13 @@ Titles are never changed once cited from another file.
 **Decision.** The schedule line says what fires next ("Next: Screensaver after 2 min idle") with "Times count from your last activity" under the stops; suspend and hibernate rows say what they do when on; switch tooltips say when turning one on turns the other off; minutes fields show their range and the stage limiting it; the footer notes that apps can delay idle actions and when hibernation is unavailable; run-now tooltips say they work while paused. The then-hibernate row is "↳ Hibernate after", under the suspend name with systemd's delay in a greyed stepper-sized box ("2 h", "45 min / battery") and, on hovering the box, where it comes from and how to change it.
 **Why.** Kike found the plugin's information scarce. Astra (gpt-6-astra) ranked what a user cannot learn from the panel; Kike asked for it where better, and for "Then hibernate after".
 **Alternative rejected.** An "Idle for 8 min" countdown: the panel opening is activity, so it would never show. Naming the inhibiting app: the service does not know it. Replacing the hero's stage count with "Automatic stages on": the count says more. Captions under the suspend and hibernate names ("Locks, then suspends"): pushed the row's controls out of the card, and Kike found them pointless.
+
+## 2026-10-24 · Every config write keeps the stage rules
+**Decision.** `mutateIdleConfig` passes each new entry through `IdleModel.exclusiveSettings`: suspend and hibernate both on becomes hibernate only (where the system can hibernate), and "Hibernate after" goes off while suspend is off. Hibernate counts as off where logind cannot hibernate.
+**Why.** A config edited by hand with both on left a stale `suspendEnabled` that bounds ignored and that came back when hibernate went off, out of order with lock. Found by a Claude review of the branch.
+**Alternative rejected.** Fixing each switch path: misses timeouts and any write added later.
+
+## 2026-10-24 · 1.6.0 replaces 1.5.0 in #12622
+**Decision.** 1.5.0 was never approved, so #12622 was retitled to 1.6.0 and pointed at the 1.6.0 commit instead of waiting to publish 1.5.0 first. Tag `v1.5.0` stays where it was.
+**Why.** Kike: publishing an old version and then this one makes no sense.
+**Alternative rejected.** A second `[Verify]` issue after 1.5.0's approval.

@@ -636,9 +636,9 @@ Item {
   // same write.
   function setSuspendThenHibernate(value) {
     var enabled = !!value
-    if (root.suspendThenHibernate === enabled) return true
     if (enabled && !stageEnabled("suspend"))
       return setGatedStage("suspend", true, function(idle) { idle.suspendThenHibernate = true })
+    if (root.suspendThenHibernate === enabled) return true
     return mutateIdleConfig("suspendThenHibernate " + (enabled ? "on" : "off"), function(idle) {
       idle.suspendThenHibernate = enabled
     })
@@ -710,7 +710,7 @@ Item {
     if (name === "standby") return root.standbyEnabled
     if (name === "lock") return root.lockEnabled
     if (name === "suspend") return root.suspendEnabled && !root.suspendOverridden
-    if (name === "hibernate") return root.hibernateEnabled
+    if (name === "hibernate") return root.hibernateEnabled && root.canHibernate
     return false
   }
 
@@ -810,6 +810,7 @@ Item {
     }
     var next = IdleModel.stageSettingsFor(root.entrySettings, root.stageConfig)
     mutate(next)
+    IdleModel.exclusiveSettings(next, root.canHibernate)
     if (JSON.stringify(next) === JSON.stringify(root.entrySettings)) return true
     var written = root.shell.updateEntryInline(root.pluginId, next)
     logEvent(written === false ? "config-write-rejected" : "config", label)
@@ -889,7 +890,8 @@ Item {
       return setGatedStage("lock", enabled)
     }
     if (name === "suspend" || name === "hibernate") {
-      if (stageEnabled(name) === enabled) return true
+      // Off checks the stored flag: one that is set but not in effect still gets cleared.
+      if (enabled ? stageEnabled(name) : !root[name + "Enabled"]) return true
       if (name === "hibernate" && enabled && !root.canHibernate) return false
       return setGatedStage(name, enabled)
     }
@@ -908,8 +910,6 @@ Item {
       idle[name + "Enabled"] = enabled
       idle[name] = seconds
       if (other !== "") idle[other + "Enabled"] = false
-      // Then hibernate modifies suspend, so it goes off with it.
-      if (!idle.suspendEnabled) idle.suspendThenHibernate = false
       if (extra) extra(idle)
     })
     if (!written) return false
@@ -1344,9 +1344,12 @@ Item {
     function stage(name: string, action: string): string {
       if (!IdleModel.isStage(name)) return "unknown stage: " + name
       var act = String(action || "status")
-      if (act === "on" || act === "off") root.setStageEnabled(name, act === "on")
-      else if (act === "toggle") root.setStageEnabled(name, !root.stageEnabled(name))
-      else if (act !== "status") return "unknown action: " + act
+      if (act !== "on" && act !== "off" && act !== "toggle" && act !== "status") return "unknown action: " + act
+      // Config reloads after this returns, so a written change answers with the state asked for.
+      if (act !== "status") {
+        var want = act === "toggle" ? !root.stageEnabled(name) : act === "on"
+        if (root.setStageEnabled(name, want)) return want ? "on" : "off"
+      }
       return root.stageEnabled(name) ? "on" : "off"
     }
 
@@ -1373,10 +1376,13 @@ Item {
     // omarchy-shell idle suspendThenHibernate <on|off|toggle|status>
     function suspendThenHibernate(action: string): string {
       var act = String(action || "status")
-      if (act === "on" || act === "off") root.setSuspendThenHibernate(act === "on")
-      else if (act === "toggle") root.setSuspendThenHibernate(!root.suspendThenHibernate)
-      else if (act !== "status") return "unknown action: " + act
-      return (root.suspendThenHibernate ? "on" : "off") + (root.canSuspendThenHibernate ? "" : " (not available here, suspends instead)")
+      if (act !== "on" && act !== "off" && act !== "toggle" && act !== "status") return "unknown action: " + act
+      var state = root.suspendThenHibernate
+      if (act !== "status") {
+        var want = act === "toggle" ? !state : act === "on"
+        if (root.setSuspendThenHibernate(want)) state = want
+      }
+      return (state ? "on" : "off") + (root.canSuspendThenHibernate ? "" : " (not available here, suspends instead)")
     }
 
     function hibernate(): string {

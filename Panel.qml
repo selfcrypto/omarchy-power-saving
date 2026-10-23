@@ -446,7 +446,7 @@ Panel {
     open: root.opened
     focusTarget: keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(420))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight, Style.space(640))
+    contentHeight: panel.fittedContentHeight(column.implicitHeight)
 
     // Not the stock PanelKeyCatcher: it fires on key press only, and turns
     // lowercase "l" into a cursor move before any panel sees it. Two things
