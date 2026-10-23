@@ -96,8 +96,17 @@ Item {
   readonly property bool standbyEnabled: IdleModel.boolFromConfig(stageConfig.standbyEnabled, false)
   readonly property bool suspendEnabled: IdleModel.boolFromConfig(stageConfig.suspendEnabled, false)
   readonly property bool hibernateEnabled: IdleModel.boolFromConfig(stageConfig.hibernateEnabled, false)
-  // logind's CanHibernate answer: hibernation set up (swap, resume=) and allowed.
+  // Suspend through logind's SuspendThenHibernate: suspend, then hibernate when
+  // systemd decides (HibernateDelaySec=, battery level). Plain suspend where
+  // logind cannot.
+  readonly property bool suspendThenHibernate: IdleModel.boolFromConfig(stageConfig.suspendThenHibernate, false)
+  // logind's CanHibernate and CanSuspendThenHibernate answers: hibernation set
+  // up (swap, resume=) and allowed.
   property bool canHibernate: false
+  property bool canSuspendThenHibernate: false
+  // Suspend and hibernate are exclusive (IdleModel.EXCLUSIVE). Both on in
+  // shell.json by hand: hibernate wins and suspend counts as off.
+  readonly property bool suspendOverridden: suspendEnabled && hibernateEnabled && canHibernate
   readonly property bool screensaverEnabled: screensaverToggleLoaded && !screensaverOff
   readonly property int firstIdleTimeoutSeconds: IdleModel.firstTimeout(screensaverEnabled, screensaverTimeoutSeconds, lockEnabled, lockTimeoutSeconds)
   readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
@@ -115,7 +124,7 @@ Item {
   readonly property bool idleEnabled: stayAwakeStateLoaded && !stayAwake && !stockIdleEnabled
   readonly property bool cycleEnabled: idleEnabled && (screensaverEnabled || lockEnabled)
   readonly property bool standbyArmed: idleEnabled && standbyEnabled
-  readonly property bool suspendArmed: idleEnabled && suspendEnabled
+  readonly property bool suspendArmed: idleEnabled && suspendEnabled && !suspendOverridden
   readonly property bool hibernateArmed: idleEnabled && hibernateEnabled && canHibernate
   readonly property string screensaverClass: "org.omarchy.screensaver"
   property var cycleMonitor: null
@@ -598,18 +607,32 @@ Item {
 
   // Suspend is asked of logind directly: the org.freedesktop.login1 Suspend
   // call, which is what Omarchy's own Suspend menu entry ends up making too.
-  // Hibernate is the same path with logind's Hibernate call.
+  // Hibernate is the same path with logind's Hibernate call. With
+  // suspendThenHibernate on, suspend calls SuspendThenHibernate, asked again
+  // at that moment so a system where it has gone since still suspends.
   readonly property string logindCall: "busctl call org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager"
+  readonly property string suspendCall: root.suspendThenHibernate
+    ? "if [ \"$(" + root.logindCall + " CanSuspendThenHibernate)\" = 's \"yes\"' ]; then "
+      + root.logindCall + " SuspendThenHibernate b true; else " + root.logindCall + " Suspend b true; fi"
+    : root.logindCall + " Suspend b true"
 
   function suspendSystem(reason) {
-    sleepSystem("suspend", "Suspend", suspendProcess, reason)
+    sleepSystem("suspend", root.suspendCall, suspendProcess, reason)
   }
 
   function hibernateSystem(reason) {
-    sleepSystem("hibernate", "Hibernate", hibernateProcess, reason)
+    sleepSystem("hibernate", root.logindCall + " Hibernate b true", hibernateProcess, reason)
   }
 
-  function sleepSystem(label, method, process, reason) {
+  function setSuspendThenHibernate(value) {
+    var enabled = !!value
+    if (root.suspendThenHibernate === enabled) return true
+    return mutateIdleConfig("suspendThenHibernate " + (enabled ? "on" : "off"), function(idle) {
+      idle.suspendThenHibernate = enabled
+    })
+  }
+
+  function sleepSystem(label, call, process, reason) {
     logEvent(label + "-system", reason || "requested")
     root.lastSuspendAt = nowIso()
     // Resume must not land on monitors this service left in DPMS off: the
@@ -627,7 +650,7 @@ Item {
     endIdleCycle()
     // Whatever idle time there is after the resume counts from scratch.
     endAway(label)
-    runProcess(process, label, "omarchy-system-lock; " + root.logindCall + " " + method + " b true")
+    runProcess(process, label, "omarchy-system-lock; " + call)
   }
 
   // Asked at start and each time the panel opens, since hibernation can be
@@ -660,7 +683,7 @@ Item {
     if (name === "screensaver") return root.screensaverEnabled
     if (name === "standby") return root.standbyEnabled
     if (name === "lock") return root.lockEnabled
-    if (name === "suspend") return root.suspendEnabled
+    if (name === "suspend") return root.suspendEnabled && !root.suspendOverridden
     if (name === "hibernate") return root.hibernateEnabled
     return false
   }
@@ -693,6 +716,7 @@ Item {
         hibernate: stageJson("hibernate")
       },
       canHibernate: root.canHibernate,
+      suspendThenHibernate: { enabled: root.suspendThenHibernate, available: root.canSuspendThenHibernate },
       idle: root.cycleIdle,
       standbyIdle: root.standbyIdle,
       standbyActive: root.standbyActive,
@@ -795,7 +819,11 @@ Item {
 
   // Tells the panel a stage was moved; called only once the write went through.
   function noteMoved(name, seconds) {
-    root.orderNote = IdleModel.stageLabel(name) + " moved to " + IdleModel.durationText(seconds)
+    note(IdleModel.stageLabel(name) + " moved to " + IdleModel.durationText(seconds))
+  }
+
+  function note(text) {
+    root.orderNote = text
     orderNoteTimer.restart()
   }
 
@@ -827,27 +855,32 @@ Item {
       if (root.lockEnabled === enabled) return true
       return setGatedStage("lock", enabled)
     }
-    if (name === "suspend") {
-      if (root.suspendEnabled === enabled) return true
-      return setGatedStage("suspend", enabled)
-    }
-    if (name === "hibernate") {
-      if (root.hibernateEnabled === enabled) return true
-      return setGatedStage("hibernate", enabled)
+    if (name === "suspend" || name === "hibernate") {
+      if (stageEnabled(name) === enabled) return true
+      if (name === "hibernate" && enabled && !root.canHibernate) return false
+      return setGatedStage(name, enabled)
     }
     return false
   }
 
   // Standby, lock, suspend and hibernate: switch and timeout in one config write, since
   // a second write would start from config that has not reloaded yet.
+  // Turning suspend or hibernate on turns the other off in the same write.
   function setGatedStage(name, enabled) {
     var seconds = enabled ? timeoutWhenEnabled(name) : stageTimeout(name)
+    var other = enabled ? IdleModel.exclusiveWith(name) : ""
+    var otherWasOn = other !== "" && stageEnabled(other)
     var written = mutateIdleConfig(name + " " + (enabled ? "on" : "off"), function(idle) {
       idle[name + "Enabled"] = enabled
       idle[name] = seconds
+      if (other !== "") idle[other + "Enabled"] = false
     })
-    if (written && seconds !== stageTimeout(name)) noteMoved(name, seconds)
-    return written
+    if (!written) return false
+    var notes = []
+    if (seconds !== stageTimeout(name)) notes.push(IdleModel.stageLabel(name) + " moved to " + IdleModel.durationText(seconds))
+    if (otherWasOn) notes.push(IdleModel.stageLabel(other) + " switched off")
+    if (notes.length) note(notes.join(" · "))
+    return true
   }
 
   function persistStayAwake(value) {
@@ -1156,9 +1189,14 @@ Item {
   }
   Process {
     id: hibernateProbe
-    command: ["busctl", "call", "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "CanHibernate"]
+    command: ["bash", "-c", "echo \"hibernate=$(" + root.logindCall + " CanHibernate 2>/dev/null)\"; "
+      + "echo \"then=$(" + root.logindCall + " CanSuspendThenHibernate 2>/dev/null)\""]
     stdout: StdioCollector {
-      onStreamFinished: root.canHibernate = String(text).trim() === "s \"yes\""
+      onStreamFinished: {
+        var text = String(this.text)
+        root.canHibernate = text.indexOf("hibernate=s \"yes\"") !== -1
+        root.canSuspendThenHibernate = text.indexOf("then=s \"yes\"") !== -1
+      }
     }
   }
 
@@ -1291,6 +1329,15 @@ Item {
     function suspend(): string {
       root.suspendSystem("ipc")
       return "ok"
+    }
+
+    // omarchy-shell idle suspendThenHibernate <on|off|toggle|status>
+    function suspendThenHibernate(action: string): string {
+      var act = String(action || "status")
+      if (act === "on" || act === "off") root.setSuspendThenHibernate(act === "on")
+      else if (act === "toggle") root.setSuspendThenHibernate(!root.suspendThenHibernate)
+      else if (act !== "status") return "unknown action: " + act
+      return (root.suspendThenHibernate ? "on" : "off") + (root.canSuspendThenHibernate ? "" : " (not available here, suspends instead)")
     }
 
     function hibernate(): string {

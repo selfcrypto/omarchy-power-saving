@@ -12,7 +12,8 @@ import "IdleModel.js" as IdleModel
 Rectangle {
   id: root
 
-  // [{ key, glyph, number, enabled, seconds }] in any order.
+  // [{ key, glyph, number, enabled, seconds, note }] in any order; `note`,
+  // when set, is a caption under the time.
   property var stages: []
   // One line above the stops; empty hides it.
   property string status: ""
@@ -134,6 +135,18 @@ Rectangle {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 font.strikeout: !stop.armed
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+              }
+
+              Text {
+                visible: !!stop.modelData.note
+                width: parent.width
+                textFormat: Text.PlainText
+                text: stop.modelData.note || ""
+                color: root.secondary
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
               }

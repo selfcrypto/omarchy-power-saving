@@ -75,7 +75,7 @@ Titles are never changed once cited from another file.
 **Alternative rejected.** Cancelling the cycle with the away state: a config write while the user is away would put the lock back by a full cycle.
 
 ## 2026-10-23 · Hibernate is a stage of its own
-**Decision.** Hibernate is a fifth stage in its own panel section, with switch, minutes stepper, key `5`, run-now key `h` and a schedule dot. It calls logind's `Hibernate` after locking, and is shown and armed only when `CanHibernate` answers `yes`. No order rule ties it to suspend.
+**Decision.** Hibernate is a fifth stage in its own panel section, with switch, minutes stepper, key `5`, run-now key `h` and a schedule dot. It calls logind's `Hibernate` after locking, and is shown and armed only when `CanHibernate` answers `yes`.
 **Why.** Kike asked for hibernation as a section with the same rules as the others. A mode chooser under the suspend row (suspend / then hibernate / hibernate) was built first and rejected as looking botched.
 **Alternative rejected.** The mode chooser. Astra (gpt-6-astra) suggested putting Hibernate in the System section; Kike asked for its own section.
 
@@ -83,3 +83,8 @@ Titles are never changed once cited from another file.
 **Decision.** At start the service reads `hyprctl clients -j` once and tracks any `org.omarchy.screensaver` window already open.
 **Why.** A shell restart under a running screensaver (Claude restarted it for a live check while Kike was away) left the window untracked: input did not close it, the next cycle's launch found it running and added nothing, and the restarted bar was drawn over it.
 **Alternative rejected.** Closing it at start: the user may still be away.
+
+## 2026-10-23 · Suspend and hibernate exclusive; then hibernate as a suspend switch
+**Decision.** Switching suspend or hibernate on switches the other off in the same write, keeping both times; both on by hand means hibernate wins. Lock comes no later than hibernate, as with suspend. Suspend-then-hibernate is a switch under the suspend row (`suspendThenHibernate`), shown where logind can, captioned "Timing managed by system"; the schedule notes "then hibernate" on the suspend stop.
+**Why.** With both on only the earlier ever fires: the machine is asleep when the later time comes. The suspend-to-hibernate delay is systemd's (`HibernateDelaySec=`, battery alarms, `HibernateOnACPower=`), root only, so the plugin cannot show an exact time. Astra's (gpt-6-astra) recommendation, accepted by Kike.
+**Alternative rejected.** Hibernate later than suspend meaning suspend-then-hibernate: changes the suspend call by moving a time, and shows a time the plugin cannot keep.

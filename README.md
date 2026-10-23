@@ -97,7 +97,7 @@ Panel:
 Order within a group:
 
 - While both are on, the screensaver cannot come after standby, and lock
-  cannot come after suspend. Equal times are allowed. Lock and standby are
+  cannot come after suspend or hibernate. Equal times are allowed. Lock and standby are
   in different groups and can be in either order.
 - The steppers stop at the other stage's time.
 - Switching a stage on moves its time to the nearest one that keeps the
@@ -171,9 +171,21 @@ Hibernate:
 - Locks the session first and turns the monitors back on, as suspend does.
 - Goes through logind's `Hibernate` call and needs no privileges.
 - Idle inhibitors are respected.
-- Its timeout counts from the moment you went idle, like the others. With
-  suspend on and an earlier time, the machine is asleep when the hibernate
-  time comes, so it does not hibernate.
+- Suspend and hibernate cannot both be on: switching one on switches the
+  other off, and the panel says so. Both keep their times. If both are on in
+  `shell.json`, hibernate wins.
+- Lock comes no later than hibernate while both are on, as with suspend.
+
+Then hibernate:
+
+- A switch under the suspend row. Suspend goes through logind's
+  `SuspendThenHibernate`: the machine suspends, then wakes and hibernates
+  when systemd decides. Useful on a laptop left on battery.
+- The timing is systemd's (`HibernateDelaySec=` in
+  `/etc/systemd/sleep.conf.d/`, battery alarms), not the plugin's. The
+  schedule marks the suspend stop "then hibernate".
+- Shown where logind can do it. If it has gone by the time the machine
+  suspends, it just suspends. Applies to "suspend now" too.
 
 All timeouts count from the moment you went idle. Starting the
 screensaver or locking does not push the later stages back.
@@ -200,7 +212,8 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
   "lockEnabled": false,
   "standbyEnabled": true,
   "suspendEnabled": true,
-  "hibernateEnabled": false
+  "hibernateEnabled": false,
+  "suspendThenHibernate": false
 }
 ```
 
@@ -215,6 +228,7 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
 | `lockEnabled` | Lock stage on or off | `true` |
 | `suspendEnabled` | Suspend stage on or off | `false` |
 | `hibernateEnabled` | Hibernate stage on or off | `false` |
+| `suspendThenHibernate` | Suspend, then hibernate | `false` |
 
 The minimum timeout is 10 seconds. The panel and the IPC `timeout` call keep
 the order within a group described above; values written to `shell.json` by
@@ -244,6 +258,7 @@ omarchy-shell idle standby                      # monitors off now
 omarchy-shell idle wake                         # monitors on now
 omarchy-shell idle suspend                      # suspend now
 omarchy-shell idle hibernate                    # hibernate now
+omarchy-shell idle suspendThenHibernate on      # on | off | toggle | status
 omarchy-shell idle enable | disable | toggle    # stay awake, as in the stock service
 ```
 

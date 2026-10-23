@@ -27,8 +27,8 @@ Budget 15 KB.
    writes switch and timeout of one stage together. Fix: keep a pending entry in the service and
    apply each mutation onto it until the reload matches. Found by the Fable review, 2026-10-22.
 
-5. Branch `suspend-then-hibernate` (not pushed): the lock fix and a Hibernate stage. Suspend-then-hibernate
-   is undecided (Astra's opinion given to Kike 2026-10-23). No real hibernate tested yet: it writes RAM to
+5. Branch `suspend-then-hibernate` (not pushed): the lock fix, a Hibernate stage exclusive with suspend,
+   and a "Then hibernate" switch. IPC checked live; the panel with the switch not yet seen. No real hibernate tested yet: it writes RAM to
    the swapfile on the NVMe, only with Kike's go-ahead after closing what is open. Releases as 1.6.0
    after #12622 is approved.
 

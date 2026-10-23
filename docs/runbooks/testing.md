@@ -26,7 +26,8 @@ journalctl --user --since "-2 min" | grep -i power-saving
 
 The hot reload keeps the old compiled QML, so the restart is needed. Restart only while
 `omarchy-shell idle status` shows `"away": false` and no screensaver windows: a restart under a
-running screensaver draws the bar over it. The panel opens on the monitor
+running screensaver draws the bar over it. Ask Kike before any live step: an open panel takes
+the keyboard, so his typing lands on the panel keys. The panel opens on the monitor
 whose bar answers the IPC. Stay awake is on while an agent works; `omarchy-shell idle enable` shows
 the schedule live and `omarchy-shell idle disable` turns stay awake back on.
 

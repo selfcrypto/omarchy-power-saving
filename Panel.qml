@@ -55,6 +55,12 @@ Panel {
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
   function hibernateNow() { if (!canHibernate) return; root.close(); svc.hibernateSystem("panel") }
+  // "Then hibernate" under suspend: offered where logind can suspend then
+  // hibernate, and kept in view while it is on so it can be turned off.
+  readonly property bool thenHibernate: ready && svc.suspendThenHibernate
+  readonly property bool canThenHibernate: ready && svc.canSuspendThenHibernate
+  readonly property bool showThenHibernate: thenHibernate || (canThenHibernate && stageEnabled("suspend"))
+  function toggleThenHibernate() { if (ready) svc.setSuspendThenHibernate(!thenHibernate) }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
   function standbyNow() { if (!ready) return; root.close(); svc.standbyDisplays("panel") }
   function runStageNow(key) {
@@ -69,7 +75,8 @@ Panel {
     var list = []
     for (var i = 0; i < stages.length; i++) {
       var key = stages[i].key
-      list.push({ key: key, glyph: stages[i].glyph, number: stages[i].number, enabled: root.stageEnabled(key), seconds: root.stageSeconds(key) })
+      list.push({ key: key, glyph: stages[i].glyph, number: stages[i].number, enabled: root.stageEnabled(key), seconds: root.stageSeconds(key),
+        note: key === "suspend" && root.thenHibernate && root.canThenHibernate ? "then hibernate" : "" })
     }
     return list
   }
@@ -80,6 +87,7 @@ Panel {
   readonly property string scheduleStatus: {
     if (!ready) return "Service not running"
     if (svc.orderNote !== "") return svc.orderNote
+    if (svc.suspendOverridden) return "Suspend is off while Hibernate is on"
     if (svc.stockIdleEnabled) return "Paused while omarchy.idle is on. Run: omarchy plugin disable omarchy.idle"
     if (stayAwake) return "Paused. t resumes"
     if (svc.standbyActive) return "Displays in standby"
@@ -246,10 +254,66 @@ Panel {
     }
   }
 
+  // Under the suspend row, in the name column: suspend through logind's
+  // SuspendThenHibernate. When it hibernates is systemd's call.
+  component ThenHibernateRow: Item {
+    id: thenRow
+    width: parent ? parent.width : 0
+    height: thenLayout.implicitHeight + Style.space(10)
+
+    RowLayout {
+      id: thenLayout
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: Style.space(8) + Style.space(30) + Style.space(8)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Column {
+        Layout.fillWidth: true
+        spacing: Style.space(2)
+
+        Text {
+          text: "Then hibernate"
+          color: root.thenHibernate && root.stageEnabled("suspend") ? root.foreground : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Text {
+          width: parent.width
+          textFormat: Text.PlainText
+          text: root.canThenHibernate ? "Timing managed by system" : "Unavailable; suspends instead"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+        }
+      }
+
+      ToggleSwitch {
+        id: thenSwitch
+        checked: root.thenHibernate
+        interactive: root.ready
+        foreground: root.foreground
+        onToggled: root.toggleThenHibernate()
+
+        PanelToolTip {
+          visible: thenSwitch.containsMouse
+          text: "Suspend, then hibernate when systemd decides: HibernateDelaySec= in sleep.conf, by default 2 h without a battery and on low battery with one"
+          fontFamily: root.fontFamily
+        }
+      }
+    }
+  }
+
   component StageGroup: Column {
     id: group
     required property string title
     required property var entries
+    // Shown at the bottom of the group's card, when set.
+    property Component footer: null
     width: parent ? parent.width : 0
     spacing: Style.space(6)
 
@@ -273,8 +337,18 @@ Panel {
           model: group.entries
           delegate: StageRow {}
         }
+        Loader {
+          width: parent.width
+          active: group.footer !== null
+          sourceComponent: group.footer
+        }
       }
     }
+  }
+
+  Component {
+    id: thenHibernateRowComponent
+    ThenHibernateRow {}
   }
 
   BarIconButton {
@@ -414,6 +488,7 @@ Panel {
           StageGroup {
             title: "System"
             entries: root.systemStages
+            footer: root.showThenHibernate ? thenHibernateRowComponent : null
           }
 
           StageGroup {

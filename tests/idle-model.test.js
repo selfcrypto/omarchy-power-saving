@@ -55,10 +55,10 @@ test("summaryText lists stages that are on, in firing order", () => {
   assert.strictEqual(M.summaryText(list), "Screensaver 2 min → Lock 10 min")
 })
 
-test("hibernate is a stage of its own group", () => {
+test("hibernate only follows lock", () => {
   assert.ok(M.isStage("hibernate"))
   const s = Object.assign(states([true, 300], [true, 600], [true, 900], [true, 1200]), { hibernate: { enabled: true, seconds: 60 } })
-  assert.deepStrictEqual(M.timeoutBounds("hibernate", s, 10), { min: 10, max: -1 })
+  assert.deepStrictEqual(M.timeoutBounds("hibernate", s, 10), { min: 900, max: -1 })
   assert.deepStrictEqual(M.timeoutBounds("suspend", s, 10), { min: 900, max: -1 })
 })
 
@@ -66,4 +66,16 @@ test("the hibernate keys are carried on every write", () => {
   const out = M.stageSettingsFor({}, { hibernate: 3600, hibernateEnabled: true })
   assert.strictEqual(out.hibernate, 3600)
   assert.strictEqual(out.hibernateEnabled, true)
+})
+
+test("lock comes no later than suspend or hibernate, whichever is earlier", () => {
+  const s = Object.assign(states([false, 300], [false, 600], [true, 600], [true, 1200]), { hibernate: { enabled: true, seconds: 900 } })
+  assert.deepStrictEqual(M.timeoutBounds("lock", s, 10), { min: 10, max: 900 })
+  assert.deepStrictEqual(M.timeoutBounds("hibernate", s, 10), { min: 600, max: -1 })
+})
+
+test("suspend and hibernate exclude each other", () => {
+  assert.strictEqual(M.exclusiveWith("suspend"), "hibernate")
+  assert.strictEqual(M.exclusiveWith("hibernate"), "suspend")
+  assert.strictEqual(M.exclusiveWith("lock"), "")
 })

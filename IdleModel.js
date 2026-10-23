@@ -75,9 +75,18 @@ function stageLabel(name) {
 }
 
 // Within a group the earlier stage may not fire after the later one: the
-// screensaver no later than standby, lock no later than suspend. Equal times
-// are allowed. Only stages that are on are held to it.
-var GROUP_ORDER = [["screensaver", "standby"], ["lock", "suspend"]]
+// screensaver no later than standby, lock no later than suspend or hibernate.
+// Equal times are allowed. Only stages that are on are held to it.
+var GROUP_ORDER = [["screensaver", "standby"], ["lock", "suspend"], ["lock", "hibernate"]]
+
+// Stages that cannot both be on: only the earlier would ever fire, since the
+// machine is asleep when the later one's time comes. Turning one on turns
+// the other off.
+var EXCLUSIVE = { suspend: "hibernate", hibernate: "suspend" }
+
+function exclusiveWith(name) {
+  return EXCLUSIVE[name] || ""
+}
 
 // Seconds `name` may be set to while it is on, given `stages` as
 // { key: { enabled, seconds } }: { min, max }, max -1 when there is no limit.
@@ -90,7 +99,7 @@ function timeoutBounds(name, stages, minSeconds) {
     if (later === name && stages[earlier] && stages[earlier].enabled)
       min = Math.max(min, stages[earlier].seconds)
     if (earlier === name && stages[later] && stages[later].enabled)
-      max = stages[later].seconds
+      max = max < 0 ? stages[later].seconds : Math.min(max, stages[later].seconds)
   }
   return { min: min, max: max }
 }
@@ -141,7 +150,7 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "hibernate", "hibernateEnabled"]
+var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "hibernate", "hibernateEnabled", "suspendThenHibernate"]
 
 // Inline settings of one bar entry (`{ id, ...settings }` in bar.layout.*),
 // without the id; {} when the entry is absent, so reads fall back.
@@ -197,6 +206,8 @@ if (typeof module !== "undefined") {
     isStage: isStage,
     stageLabel: stageLabel,
     GROUP_ORDER: GROUP_ORDER,
+    EXCLUSIVE: EXCLUSIVE,
+    exclusiveWith: exclusiveWith,
     timeoutBounds: timeoutBounds,
     clampToBounds: clampToBounds,
     firstTimeout: firstTimeout,

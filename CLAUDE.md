@@ -32,7 +32,7 @@ index). Procedures: `docs/runbooks/`. Reader-facing: `README.md`.
 
 - Colors and sizes come from `qs.Commons` (`Commons.Color`, `Style`); nothing hard-coded.
 - Panel keys must keep working: `t`, `1`-`5`, `r` and `o` (both on release), `k`, `s`, `h`.
-- Within a group the earlier stage never fires after the later one while both are on (`IdleModel.js` `timeoutBounds`).
+- Within a group the earlier stage never fires after the later one while both are on (`IdleModel.js` `timeoutBounds`). Suspend and hibernate are never both on.
 - No em dashes and no filler in code, docs, manifest, commits or issues.
 - Nothing is pushed, tagged or filed on the marketplace without asking first.
 
