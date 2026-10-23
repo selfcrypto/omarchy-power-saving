@@ -197,8 +197,8 @@ Then hibernate:
   ```
 
   It applies from the next suspend. The panel reads it when it opens.
-- Shown where logind can do it. If it has gone by the time the machine
-  suspends, it just suspends. Applies to "suspend now" too.
+- Shown where logind can do it, dimmed while suspend is off. If it has gone
+  by the time the machine suspends, it just suspends. Applies to "suspend now" too.
 
 All timeouts count from the moment you went idle. Starting the
 screensaver or locking does not push the later stages back.

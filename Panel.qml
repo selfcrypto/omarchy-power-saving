@@ -55,13 +55,14 @@ Panel {
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
   function hibernateNow() { if (!canHibernate) return; root.close(); svc.hibernateSystem("panel") }
-  // "Then hibernate" under suspend: offered where logind can suspend then
-  // hibernate, and kept in view while it is on so it can be turned off.
+  // "Then hibernate" under suspend: shown where logind can suspend then
+  // hibernate, dimmed while suspend is off, and kept in view while it is on
+  // so it can be turned off.
   readonly property bool thenHibernate: ready && svc.suspendThenHibernate
   readonly property bool canThenHibernate: ready && svc.canSuspendThenHibernate
   readonly property string hibernateDelayText: ready ? svc.hibernateDelayText : ""
   readonly property string hibernateDelayHint: ready ? svc.hibernateDelayHint : ""
-  readonly property bool showThenHibernate: thenHibernate || (canThenHibernate && stageEnabled("suspend"))
+  readonly property bool showThenHibernate: thenHibernate || canThenHibernate
   function toggleThenHibernate() { if (ready) svc.setSuspendThenHibernate(!thenHibernate) }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
   function standbyNow() { if (!ready) return; root.close(); svc.standbyDisplays("panel") }

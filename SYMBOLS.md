@@ -69,7 +69,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (539 lines)
+## Panel.qml (540 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L26
 - property ready L27
@@ -90,30 +90,30 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - function lockNow L55
 - function suspendNow L56
 - function hibernateNow L57
-- property thenHibernate L60: hibernate, and kept in view while it is on so it can be turned off.
-- property canThenHibernate L61
-- property hibernateDelayText L62
-- property hibernateDelayHint L63
-- property showThenHibernate L64
-- function toggleThenHibernate L65
-- function screensaverNow L66
-- function standbyNow L67
-- function runStageNow L68
-- property stageList L76
-- property summary L85
-- property stagesOn L87
-- property scheduleStatus L89: Above the schedule; empty while it runs normally, since the dots say it all.
-- function minutesRange L104: minute, or out of order by hand, is shown as it is and not clamped.
-- property foreground L113
-- property accent L114
-- property urgent L115
-- property dim L116
-- property fontFamily L117
-- property hoverFill L118
-- component KeyCap L130: A key as printed on the keyboard, for the keys the panel answers to.
-- component StageRow L153: glyph-and-name part is a button that runs the stage at once.
-- component ThenHibernateRow L261: SuspendThenHibernate. When it hibernates is systemd's call.
-- component StageGroup L313
+- property thenHibernate L61: so it can be turned off.
+- property canThenHibernate L62
+- property hibernateDelayText L63
+- property hibernateDelayHint L64
+- property showThenHibernate L65
+- function toggleThenHibernate L66
+- function screensaverNow L67
+- function standbyNow L68
+- function runStageNow L69
+- property stageList L77
+- property summary L86
+- property stagesOn L88
+- property scheduleStatus L90: Above the schedule; empty while it runs normally, since the dots say it all.
+- function minutesRange L105: minute, or out of order by hand, is shown as it is and not clamped.
+- property foreground L114
+- property accent L115
+- property urgent L116
+- property dim L117
+- property fontFamily L118
+- property hoverFill L119
+- component KeyCap L131: A key as printed on the keyboard, for the keys the panel answers to.
+- component StageRow L154: glyph-and-name part is a button that runs the stage at once.
+- component ThenHibernateRow L262: SuspendThenHibernate. When it hibernates is systemd's call.
+- component StageGroup L314
 
 ## Service.qml (1392 lines)
 Power-saving idle service in five stages, each with its own switch and
