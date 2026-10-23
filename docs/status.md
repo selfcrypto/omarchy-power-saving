@@ -41,6 +41,9 @@ Budget 15 KB.
 
 ## Done
 
+- **2026-10-23.** "Then hibernate" could be switched on with suspend off (found by Kike). Now only
+  while suspend is on, in the panel and over IPC; switching it off always works.
+
 - **2026-10-23.** A screensaver open when the service starts is adopted, so input closes it.
 
 - **2026-10-23.** Lock fired on an active user: a suspend switch during an idle cycle ended the away

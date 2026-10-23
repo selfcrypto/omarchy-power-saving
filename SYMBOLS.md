@@ -73,7 +73,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (618 lines)
+## Panel.qml (622 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L26
 - property ready L27
@@ -120,9 +120,9 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - component KeyCap L147: A key as printed on the keyboard, for the keys the panel answers to.
 - component StageRow L170: glyph-and-name part is a button that runs the stage at once.
 - component ThenHibernateRow L297: SuspendThenHibernate. When it hibernates is systemd's call.
-- component StageGroup L352
+- component StageGroup L356
 
-## Service.qml (1393 lines)
+## Service.qml (1396 lines)
 Power-saving idle service in five stages, each with its own switch and
 - property shell L59: Injected by omarchy-shell (the service loader).
 - property home L61
@@ -253,35 +253,35 @@ Power-saving idle service in five stages, each with its own switch and
 - property suspendCall L623
 - function suspendSystem L628
 - function hibernateSystem L632
-- function setSuspendThenHibernate L636
-- function sleepSystem L644
-- function refreshHibernate L667: set up or removed while the shell runs.
-- function applyHibernateProbe L671
-- function handleHibernateIdleChanged L685
-- function handleSuspendIdleChanged L694
-- function stageEnabled L705
-- function stageTimeout L714
-- function stageJson L723
-- function statusJson L727
-- function mutateIdleConfig L803: `shell.barConfig`, which is what re-arms the monitors.
-- function stageStates L817: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
-- function stageTimeoutBounds L828: that is off has no neighbour limit; it is moved into range when turned on.
-- function setStageTimeout L833
-- function timeoutWhenEnabled L843: that keeps it in order with the other stage of its group.
-- function noteMoved L851: Tells the panel a stage was moved; called only once the write went through.
-- function note L855
-- function setStageEnabled L860
-- function setGatedStage L899: Turning suspend or hibernate on turns the other off in the same write.
-- function persistStayAwake L916
-- function refreshStayAwakeState L931
-- function applyShellConfigText L935
-- function refreshScreensaverToggle L945
-- function applyScreensaverOff L949
-- function applyStayAwake L957
-- function handleStockIdle L984: this one stays paused instead of fighting them for the setting.
-- function setIdleEnabled L1000
-- function armMonitor L1032
-- function syncMonitors L1049
+- function setSuspendThenHibernate L638: switching it off always works.
+- function sleepSystem L647
+- function refreshHibernate L670: set up or removed while the shell runs.
+- function applyHibernateProbe L674
+- function handleHibernateIdleChanged L688
+- function handleSuspendIdleChanged L697
+- function stageEnabled L708
+- function stageTimeout L717
+- function stageJson L726
+- function statusJson L730
+- function mutateIdleConfig L806: `shell.barConfig`, which is what re-arms the monitors.
+- function stageStates L820: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
+- function stageTimeoutBounds L831: that is off has no neighbour limit; it is moved into range when turned on.
+- function setStageTimeout L836
+- function timeoutWhenEnabled L846: that keeps it in order with the other stage of its group.
+- function noteMoved L854: Tells the panel a stage was moved; called only once the write went through.
+- function note L858
+- function setStageEnabled L863
+- function setGatedStage L902: Turning suspend or hibernate on turns the other off in the same write.
+- function persistStayAwake L919
+- function refreshStayAwakeState L934
+- function applyShellConfigText L938
+- function refreshScreensaverToggle L948
+- function applyScreensaverOff L952
+- function applyStayAwake L960
+- function handleStockIdle L987: this one stays paused instead of fighting them for the setting.
+- function setIdleEnabled L1003
+- function armMonitor L1035
+- function syncMonitors L1052
 
 ## tests/idle-model.test.js (121 lines)
 Stage order within a group: `node --test tests/`.
