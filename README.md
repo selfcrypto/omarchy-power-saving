@@ -193,11 +193,12 @@ Then hibernate:
   `HibernateDelaySec=` if that comes first (`HibernateOnACPower=no` runs the
   delay only on battery). The schedule marks the suspend stop "then
   hibernate".
-- To change the delay (root):
+- To change the delay, create `/etc/systemd/sleep.conf.d/hibernate-delay.conf`
+  as root with:
 
-  ```bash
-  sudo mkdir -p /etc/systemd/sleep.conf.d
-  printf '[Sleep]\nHibernateDelaySec=45min\n' | sudo tee /etc/systemd/sleep.conf.d/hibernate-delay.conf
+  ```ini
+  [Sleep]
+  HibernateDelaySec=45min
   ```
 
   It applies from the next suspend. The panel reads it when it opens.

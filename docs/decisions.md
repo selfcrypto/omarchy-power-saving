@@ -108,3 +108,7 @@ Titles are never changed once cited from another file.
 **Decision.** 1.5.0 was never approved, so #12622 was retitled to 1.6.0 and pointed at the 1.6.0 commit instead of waiting to publish 1.5.0 first. Tag `v1.5.0` stays where it was.
 **Why.** Kike: publishing an old version and then this one makes no sense.
 **Alternative rejected.** A second `[Verify]` issue after 1.5.0's approval.
+
+## 2026-10-24 · No sudo in the README
+**Decision.** The README gives the hibernate delay drop-in as a file path and its content, not as `sudo` commands.
+**Why.** The marketplace security baseline flags any `sudo` or `pkexec` line, README included, and asks for a manual review. Seen on #12622 for 1.6.0.
