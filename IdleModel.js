@@ -213,21 +213,23 @@ function systemdBool(value, fallback) {
 // Without a battery: after the delay, 2 h when unset. With one: at low
 // battery, or after the delay if that comes first; with HibernateOnACPower=no
 // the delay only runs on battery (said in the hint).
-// Under "Then hibernate after": "2 h (System default)", "45 min (System
-// setting)", "45 min or at low battery (System setting)", "Low battery
-// (System default)".
+// In the box beside "Then hibernate after": "2 h", "45 min", "Low battery",
+// "45 min / battery".
 function hibernateDelayText(delay, hasBattery) {
   var seconds = timespanSeconds(delay)
   var after = seconds > 0 ? durationText(seconds) : ""
-  var source = after ? " (System setting)" : " (System default)"
-  if (!hasBattery) return (after || "2 h") + source
-  return (after ? after + " or at low battery" : "Low battery") + source
+  if (!hasBattery) return after || "2 h"
+  return after ? after + " / battery" : "Low battery"
 }
 
-// The tooltip: how to change it.
+// The box's tooltip: the value in full, where it comes from, how to change it.
 function hibernateDelayHint(delay, hasBattery, onAC) {
-  var text = "Set by systemd, not the plugin. To change it, as root: HibernateDelaySec= in /etc/systemd/sleep.conf.d/. Applies from the next suspend."
-  if (hasBattery && onAC === false && timespanSeconds(delay) > 0) text += " The delay starts after unplugging."
+  var seconds = timespanSeconds(delay)
+  var after = seconds > 0 ? durationText(seconds) : ""
+  var when = !hasBattery ? (after || "2 h") : (after ? after + " or at low battery" : "At low battery")
+  var text = when + (after ? " (System setting)" : " (System default)")
+    + ". Set by systemd, not the plugin. To change it, as root: HibernateDelaySec= in /etc/systemd/sleep.conf.d/. Applies from the next suspend."
+  if (hasBattery && onAC === false && after) text += " The delay starts after unplugging."
   return text
 }
 

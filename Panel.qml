@@ -278,52 +278,73 @@ Panel {
     }
   }
 
-  // Under the suspend row, in the name column: suspend through logind's
-  // SuspendThenHibernate. When it hibernates is systemd's call.
+  // Under the suspend row, as its 4.5: suspend through logind's
+  // SuspendThenHibernate. The box holds the delay systemd will use; it is
+  // read-only, since the plugin cannot set it, and says how to on hover.
   component ThenHibernateRow: Item {
     id: thenRow
+    readonly property bool isOn: root.thenHibernate && root.stageEnabled("suspend")
     width: parent ? parent.width : 0
-    height: thenLayout.implicitHeight + Style.space(10)
-
-    HoverHandler { id: thenHover }
-
-    PanelToolTip {
-      visible: thenHover.hovered
-      text: root.hibernateDelayHint
-      fontFamily: root.fontFamily
-    }
+    height: Style.space(40)
 
     RowLayout {
       id: thenLayout
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
+      anchors.fill: parent
       anchors.leftMargin: Style.space(8) + Style.space(30) + Style.space(8)
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
 
-      Column {
+      Text {
+        text: "4.5"
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        Layout.alignment: Qt.AlignBaseline
+      }
+
+      Text {
+        text: "Then hibernate after"
+        color: thenRow.isOn ? root.foreground : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
         Layout.fillWidth: true
-        spacing: Style.space(2)
+        Layout.maximumWidth: implicitWidth
+        Layout.minimumWidth: implicitWidth
+        Layout.alignment: Qt.AlignBaseline
+      }
+
+      Item { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.horizontalStretchFactor: 0 }
+
+      // The stepper's box, greyed: systemd's value, not the plugin's.
+      BorderSurface {
+        id: delayBox
+        readonly property var spec: Border.controlSpec("normal", root.foreground, root.accent)
+        Layout.preferredWidth: Style.space(100)
+        Layout.preferredHeight: Math.max(Style.spacing.controlHeight, Style.font.body + Style.spacing.controlPaddingY * 2)
+        color: Style.controlFill(false, false, root.foreground, root.accent)
+        borderSpec: spec
+        radius: Style.cornerRadius
+        opacity: 0.6
 
         Text {
-          width: parent.width
+          anchors.centerIn: parent
           textFormat: Text.PlainText
-          text: "Then hibernate after"
-          color: root.thenHibernate && root.stageEnabled("suspend") ? root.foreground : root.dim
+          text: root.canThenHibernate ? root.hibernateDelayText : "n/a"
+          color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
           elide: Text.ElideRight
+          width: Math.min(implicitWidth, parent.width - Style.space(12))
+          horizontalAlignment: Text.AlignHCenter
         }
 
-        Text {
-          width: parent.width
-          textFormat: Text.PlainText
-          text: root.canThenHibernate ? root.hibernateDelayText : "Unavailable; suspends instead"
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
+        HoverHandler { id: delayHover }
+
+        PanelToolTip {
+          visible: delayHover.hovered
+          text: root.canThenHibernate ? root.hibernateDelayHint : "The system cannot suspend then hibernate; suspend only."
+          fontFamily: root.fontFamily
         }
       }
 

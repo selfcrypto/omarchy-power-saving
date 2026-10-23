@@ -5,7 +5,7 @@ One section per file: its first doc line, then each top-level symbol with its li
 
 <!-- repo-docs v3 roots=. 2026-10-23 -->
 
-## IdleModel.js (315 lines)
+## IdleModel.js (317 lines)
 Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - function secondsFromConfig L4
 - function boolFromConfig L10
@@ -28,13 +28,13 @@ Pure helpers shared by Service.qml and Panel.qml. Cloned from
 - const TIMESPAN_UNITS L176
 - function timespanSeconds L187: -1 when it is empty or not understood.
 - function systemdBool L204: A systemd boolean (systemd.syntax(7)); `fallback` when empty or unknown.
-- function hibernateDelayText L219: (System default)".
-- function hibernateDelayHint L228: The tooltip: how to change it.
-- function isObject L236
-- const STAGE_KEYS L240
-- function barEntrySettings L244: without the id; {} when the entry is absent, so reads fall back.
-- function mergedStageConfig L263: A key missing from both stays missing so Service.qml's defaults apply.
-- function stageSettingsFor L275: key currently in effect, so the first write migrates the idle block.
+- function hibernateDelayText L218: "45 min / battery".
+- function hibernateDelayHint L226: The box's tooltip: the value in full, where it comes from, how to change it.
+- function isObject L238
+- const STAGE_KEYS L242
+- function barEntrySettings L246: without the id; {} when the entry is absent, so reads fall back.
+- function mergedStageConfig L265: A key missing from both stays missing so Service.qml's defaults apply.
+- function stageSettingsFor L277: key currently in effect, so the first write migrates the idle block.
 
 ## IdleSchedule.qml (199 lines)
 The stages in the order they fire: one stop per stage, sorted by timeout,
@@ -72,7 +72,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (606 lines)
+## Panel.qml (627 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L26
 - property ready L27
@@ -117,8 +117,8 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property hoverFill L134
 - component KeyCap L146: A key as printed on the keyboard, for the keys the panel answers to.
 - component StageRow L169: glyph-and-name part is a button that runs the stage at once.
-- component ThenHibernateRow L283: SuspendThenHibernate. When it hibernates is systemd's call.
-- component StageGroup L340
+- component ThenHibernateRow L284: read-only, since the plugin cannot set it, and says how to on hover.
+- component StageGroup L361
 
 ## Service.qml (1400 lines)
 Power-saving idle service in five stages, each with its own switch and
@@ -280,6 +280,6 @@ Power-saving idle service in five stages, each with its own switch and
 - function armMonitor L1039
 - function syncMonitors L1056
 
-## tests/idle-model.test.js (119 lines)
+## tests/idle-model.test.js (121 lines)
 Stage order within a group: `node --test tests/`.
 - function states L6

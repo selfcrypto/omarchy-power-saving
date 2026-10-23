@@ -96,11 +96,13 @@ test("systemd booleans", () => {
   assert.strictEqual(M.systemdBool("maybe", true), true)
 })
 
-test("the then-hibernate delay line", () => {
-  assert.strictEqual(M.hibernateDelayText("", false), "2 h (System default)")
-  assert.strictEqual(M.hibernateDelayText("45min", false), "45 min (System setting)")
-  assert.strictEqual(M.hibernateDelayText("45min", true), "45 min or at low battery (System setting)")
-  assert.strictEqual(M.hibernateDelayText("", true), "Low battery (System default)")
+test("the then-hibernate delay box and its tooltip", () => {
+  assert.strictEqual(M.hibernateDelayText("", false), "2 h")
+  assert.strictEqual(M.hibernateDelayText("45min", false), "45 min")
+  assert.strictEqual(M.hibernateDelayText("45min", true), "45 min / battery")
+  assert.strictEqual(M.hibernateDelayText("", true), "Low battery")
+  assert.ok(M.hibernateDelayHint("", false).startsWith("2 h (System default). "))
+  assert.ok(M.hibernateDelayHint("45min", true, true).startsWith("45 min or at low battery (System setting). "))
   assert.ok(M.hibernateDelayHint("45min", true, false).endsWith("The delay starts after unplugging."))
   assert.ok(!M.hibernateDelayHint("45min", false, false).includes("unplugging"))
 })
