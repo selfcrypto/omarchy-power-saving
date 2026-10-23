@@ -78,3 +78,8 @@ Titles are never changed once cited from another file.
 **Decision.** Hibernate is a fifth stage in its own panel section, with switch, minutes stepper, key `5`, run-now key `h` and a schedule dot. It calls logind's `Hibernate` after locking, and is shown and armed only when `CanHibernate` answers `yes`. No order rule ties it to suspend.
 **Why.** Kike asked for hibernation as a section with the same rules as the others. A mode chooser under the suspend row (suspend / then hibernate / hibernate) was built first and rejected as looking botched.
 **Alternative rejected.** The mode chooser. Astra (gpt-6-astra) suggested putting Hibernate in the System section; Kike asked for its own section.
+
+## 2026-10-23 · Screensaver windows open at start are adopted
+**Decision.** At start the service reads `hyprctl clients -j` once and tracks any `org.omarchy.screensaver` window already open.
+**Why.** A shell restart under a running screensaver (Claude restarted it for a live check while Kike was away) left the window untracked: input did not close it, the next cycle's launch found it running and added nothing, and the restarted bar was drawn over it.
+**Alternative rejected.** Closing it at start: the user may still be away.

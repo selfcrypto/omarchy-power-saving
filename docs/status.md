@@ -40,6 +40,8 @@ Budget 15 KB.
 
 ## Done
 
+- **2026-10-23.** A screensaver open when the service starts is adopted, so input closes it.
+
 - **2026-10-23.** Lock fired on an active user: a suspend switch during an idle cycle ended the away
   state but left the lock timer running, so input only closed the screensaver. Now the away state
   is kept and standby/suspend rescheduled (on branch `suspend-then-hibernate`).

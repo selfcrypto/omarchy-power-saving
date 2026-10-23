@@ -101,7 +101,7 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - component StageRow L143: glyph-and-name part is a button that runs the stage at once.
 - component StageGroup L249
 
-## Service.qml (1283 lines)
+## Service.qml (1314 lines)
 Power-saving idle service in five stages, each with its own switch and
 - property shell L59: Injected by omarchy-shell (the service loader).
 - property home L61
@@ -192,61 +192,62 @@ Power-saving idle service in five stages, each with its own switch and
 - function handleScreensaverWindowOpened L303
 - function handleScreensaverWindowClosed L309
 - function eventParts L318
-- function handleHyprlandEvent L322
-- property watchIdleSeconds L356: itself only exits on a key press or on losing focus.
-- property ownActionRunning L357
-- property ownActionRecent L359
-- function markOwnAction L361
-- function syncWatchMonitor L367
-- function enterAway L372
-- function endAway L383: Ends the away state without treating it as the user coming back.
-- function noteIdle L400: awaySince.
-- function scheduleAwayStages L405
-- function scheduleAwayStage L411
-- function fireAwayStandby L422
-- function fireAwaySuspend L428
-- function fireAwayHibernate L434
-- function stopScreensaver L440
-- function userReturned L447
-- function handleInput L458
-- function handleActivity L464: A monitor reported activity: `source` is its stage.
-- function handleIdleChanged L479
-- function handleWatchIdleChanged L492
-- property dpmsOffCommand L518: it a no-op.
-- property dpmsOnCommand L519
-- property screensaverStopCommand L544: it turns the monitors off.
-- function standbyDisplays L546
-- function wakeDisplays L559
-- function handleStandbyIdleChanged L565
-- property logindCall L579: Hibernate is the same path with logind's Hibernate call.
-- function suspendSystem L581
-- function hibernateSystem L585
-- function sleepSystem L589
-- function refreshHibernate L612: set up or removed while the shell runs.
-- function handleHibernateIdleChanged L616
-- function handleSuspendIdleChanged L625
-- function stageEnabled L636
-- function stageTimeout L645
-- function stageJson L654
-- function statusJson L658
-- function mutateIdleConfig L726: `shell.barConfig`, which is what re-arms the monitors.
-- function stageStates L740: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
-- function stageTimeoutBounds L751: that is off has no neighbour limit; it is moved into range when turned on.
-- function setStageTimeout L756
-- function timeoutWhenEnabled L766: that keeps it in order with the other stage of its group.
-- function noteMoved L774: Tells the panel a stage was moved; called only once the write went through.
-- function setStageEnabled L779
-- function setGatedStage L820: a second write would start from config that has not reloaded yet.
-- function persistStayAwake L830
-- function refreshStayAwakeState L845
-- function applyShellConfigText L849
-- function refreshScreensaverToggle L859
-- function applyScreensaverOff L863
-- function applyStayAwake L871
-- function handleStockIdle L898: this one stays paused instead of fighting them for the setting.
-- function setIdleEnabled L914
-- function armMonitor L946
-- function syncMonitors L963
+- function adoptScreensaverWindows L326: nothing. So the open windows are read once at start and adopted.
+- function handleHyprlandEvent L345
+- property watchIdleSeconds L379: itself only exits on a key press or on losing focus.
+- property ownActionRunning L380
+- property ownActionRecent L382
+- function markOwnAction L384
+- function syncWatchMonitor L390
+- function enterAway L395
+- function endAway L406: Ends the away state without treating it as the user coming back.
+- function noteIdle L423: awaySince.
+- function scheduleAwayStages L428
+- function scheduleAwayStage L434
+- function fireAwayStandby L445
+- function fireAwaySuspend L451
+- function fireAwayHibernate L457
+- function stopScreensaver L463
+- function userReturned L470
+- function handleInput L481
+- function handleActivity L487: A monitor reported activity: `source` is its stage.
+- function handleIdleChanged L502
+- function handleWatchIdleChanged L515
+- property dpmsOffCommand L541: it a no-op.
+- property dpmsOnCommand L542
+- property screensaverStopCommand L567: it turns the monitors off.
+- function standbyDisplays L569
+- function wakeDisplays L582
+- function handleStandbyIdleChanged L588
+- property logindCall L602: Hibernate is the same path with logind's Hibernate call.
+- function suspendSystem L604
+- function hibernateSystem L608
+- function sleepSystem L612
+- function refreshHibernate L635: set up or removed while the shell runs.
+- function handleHibernateIdleChanged L639
+- function handleSuspendIdleChanged L648
+- function stageEnabled L659
+- function stageTimeout L668
+- function stageJson L677
+- function statusJson L681
+- function mutateIdleConfig L749: `shell.barConfig`, which is what re-arms the monitors.
+- function stageStates L763: Every stage as { key: { enabled, seconds } }, for IdleModel.timeoutBounds.
+- function stageTimeoutBounds L774: that is off has no neighbour limit; it is moved into range when turned on.
+- function setStageTimeout L779
+- function timeoutWhenEnabled L789: that keeps it in order with the other stage of its group.
+- function noteMoved L797: Tells the panel a stage was moved; called only once the write went through.
+- function setStageEnabled L802
+- function setGatedStage L843: a second write would start from config that has not reloaded yet.
+- function persistStayAwake L853
+- function refreshStayAwakeState L868
+- function applyShellConfigText L872
+- function refreshScreensaverToggle L882
+- function applyScreensaverOff L886
+- function applyStayAwake L894
+- function handleStockIdle L921: this one stays paused instead of fighting them for the setting.
+- function setIdleEnabled L937
+- function armMonitor L969
+- function syncMonitors L986
 
 ## tests/idle-model.test.js (69 lines)
 Stage order within a group: `node --test tests/`.

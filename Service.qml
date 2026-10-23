@@ -319,6 +319,29 @@ Item {
     return IdleModel.eventParts(event, count)
   }
 
+  // A screensaver already open when the service starts (the shell restarted
+  // under it) sent its openwindow before anyone listened. Untracked, input
+  // never closed it and the next cycle's launch found it running and added
+  // nothing. So the open windows are read once at start and adopted.
+  function adoptScreensaverWindows(text) {
+    var clients = []
+    try {
+      clients = JSON.parse(String(text || "[]"))
+    } catch (error) {
+      return
+    }
+    if (!Array.isArray(clients)) return
+    for (var i = 0; i < clients.length; i++) {
+      var client = clients[i]
+      if (!client || String(client["class"] || "") !== root.screensaverClass) continue
+      // Events name windows without the 0x that hyprctl prints.
+      var address = String(client.address || "").replace(/^0x/, "")
+      if (!address || root.screensaverWindows[address]) continue
+      logEvent("screensaver-adopted", address)
+      setScreensaverWindow(address, true)
+    }
+  }
+
   function handleHyprlandEvent(event) {
     var name = String(event && event.name ? event.name : "")
     if (name === "openwindow") {
@@ -1125,6 +1148,13 @@ Item {
     onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "hibernate exitCode=" + exitCode + " status=" + exitStatus) }
   }
   Process {
+    id: screensaverAdoptProbe
+    command: ["hyprctl", "clients", "-j"]
+    stdout: StdioCollector {
+      onStreamFinished: root.adoptScreensaverWindows(text)
+    }
+  }
+  Process {
     id: hibernateProbe
     command: ["busctl", "call", "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "CanHibernate"]
     stdout: StdioCollector {
@@ -1206,6 +1236,7 @@ Item {
     refreshStayAwakeState()
     refreshScreensaverToggle()
     refreshHibernate()
+    screensaverAdoptProbe.running = true
   }
 
   // Same target as omarchy.idle so `omarchy-shell idle …` keeps working.
