@@ -106,7 +106,7 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - component HibernateRow L248: is systemd's (HibernateDelaySec=), shown here and set only by root.
 - component StageGroup L305
 
-## Service.qml (1260 lines)
+## Service.qml (1269 lines)
 Power-saving idle service in four stages, each with its own switch and
 - property shell L57: Injected by omarchy-shell (the service loader).
 - property home L59

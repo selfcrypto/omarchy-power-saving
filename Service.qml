@@ -966,10 +966,19 @@ Item {
     // A cycle that was started by a monitor that no longer exists has nothing
     // to end it on activity; drop it and let the new monitor start afresh.
     if (root.idledThisCycle && root.cycleMonitor !== previousCycle) cancelIdleCycle("monitor-rearm")
-    // The same goes for the away state: a stage was switched or retimed, so
-    // the count starts over with the new monitors.
-    if (root.cycleMonitor !== previousCycle || root.standbyMonitor !== previousStandby
-      || root.suspendMonitor !== previousSuspend) endAway("monitor-rearm")
+    // The same goes for the away state when the cycle monitor changed, or
+    // when nothing is armed any more. A standby or suspend change alone keeps
+    // it and reschedules those two from awaySince: ending it left a running
+    // cycle behind, so input only closed the screensaver and the lock fired
+    // on the user later.
+    if (root.cycleMonitor !== previousCycle
+      || (!root.cycleMonitor && !root.standbyMonitor && !root.suspendMonitor)) {
+      endAway("monitor-rearm")
+    } else if (root.away && (root.standbyMonitor !== previousStandby || root.suspendMonitor !== previousSuspend)) {
+      logEvent("away-reschedule", "monitor-rearm")
+      scheduleAwayStage(standbyAwayTimer, root.standbyArmed && !root.standbyFiredThisAway, root.standbyTimeoutSeconds)
+      scheduleAwayStage(suspendAwayTimer, root.suspendArmed && !root.suspendFiredThisAway, root.suspendTimeoutSeconds)
+    }
   }
 
   onCycleEnabledChanged: syncMonitors()

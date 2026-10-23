@@ -73,3 +73,8 @@ Titles are never changed once cited from another file.
 **Decision.** An option on the suspend stage calls logind's `SuspendThenHibernate`. It is shown only when `CanSuspendThenHibernate` answers `yes`, and the call checks again at suspend time, falling back to `Suspend`. The panel shows when the machine hibernates, read from `HibernateDelaySec=` and the presence of a battery; the plugin never sets it.
 **Why.** Kike asked for hibernation after a time suspended, for laptops. logind already wakes on an RTC alarm and hibernates; the delay lives in `/etc/systemd/sleep.conf.d/`, root only, and the D-Bus call takes no delay.
 **Alternative rejected.** Own RTC wake (`rtcwake`, `/sys/class/rtc/*/wakealarm`): needs root. A delay setting in the plugin: it could not be applied.
+
+## 2026-10-23 · A standby or suspend change keeps the away state
+**Decision.** When only the standby or suspend monitor is re-armed (switched or retimed), the away state is kept and those two stages are rescheduled from `awaySince`. The away state still ends when the cycle monitor changes or nothing is armed.
+**Why.** Ending it left the screensaver/lock cycle running with nothing to cancel it: input only closed the screensaver, and the lock fired minutes later while the user was at the machine. Seen on 2026-10-23 when the Claude hook switched suspend on during an idle cycle; any config write does the same.
+**Alternative rejected.** Cancelling the cycle with the away state: a config write while the user is away would put the lock back by a full cycle.

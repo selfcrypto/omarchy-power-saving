@@ -40,6 +40,10 @@ Budget 15 KB.
 
 ## Done
 
+- **2026-10-23.** Lock fired on an active user: a suspend switch during an idle cycle ended the away
+  state but left the lock timer running, so input only closed the screensaver. Now the away state
+  is kept and standby/suspend rescheduled (on branch `suspend-then-hibernate`).
+
 - **2026-10-22.** 1.5.0: schedule panel, one-line rows with key caps and −/+ steppers, stage
   order within a group, new preview, em dashes removed, node tests, repo-docs layout.
 - **2026-10-22.** Marketplace rejected the first push: `AGENTS.md` was a symlink. Now a file.
