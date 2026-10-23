@@ -26,9 +26,9 @@ This plugin replaces it.
 omarchy plugin add https://github.com/selfcrypto/omarchy-power-saving.git --enable
 ```
 
-Nothing else is needed. The plugin is declared as a clone of the stock
-`omarchy.idle` service, so Omarchy switches the stock service off when this
-plugin is enabled and back on when it is removed. Running both would lock and
+The plugin is declared as a clone of the stock `omarchy.idle` service, so
+Omarchy switches the stock service off when this plugin is enabled and back on
+when it is removed. Running both would lock and
 start the screensaver twice.
 
 The `idle.screensaver` and `idle.lock` values you already have in `shell.json`
@@ -131,8 +131,8 @@ Running a stage by hand works even when its switch is off.
 
 Screensaver:
 
-- A mouse move ends it, as well as a key press. The stock screensaver only
-  reacts to keys. Movement in the first 1.5 seconds after it appears is
+- A mouse move or a key press ends it. The stock screensaver only reacts to
+  keys. Movement in the first 1.5 seconds after it appears is
   ignored, so a hand still on the mouse does not end it at once. After that
   any movement ends it immediately, including movement that never stopped.
 - Ending the screensaver counts as activity, so a pending lock is cancelled
