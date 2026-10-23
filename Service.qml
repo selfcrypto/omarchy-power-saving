@@ -91,9 +91,10 @@ Item {
   readonly property bool lockEnabled: IdleModel.boolFromConfig(stageConfig.lockEnabled, true)
   readonly property bool standbyEnabled: IdleModel.boolFromConfig(stageConfig.standbyEnabled, false)
   readonly property bool suspendEnabled: IdleModel.boolFromConfig(stageConfig.suspendEnabled, false)
-  // Suspend through logind's SuspendThenHibernate instead of Suspend. Used
-  // only while logind says it can (hibernateAvailable); otherwise plain suspend.
-  readonly property bool suspendThenHibernate: IdleModel.boolFromConfig(stageConfig.suspendThenHibernate, false)
+  // What the suspend stage does: "suspend", "suspend-then-hibernate" or
+  // "hibernate" (IdleModel.SLEEP_MODES). A hibernate mode logind cannot do
+  // at that moment falls back to plain suspend.
+  readonly property string suspendMode: IdleModel.sleepModeFromConfig(stageConfig.suspendMode)
   readonly property bool screensaverEnabled: screensaverToggleLoaded && !screensaverOff
   readonly property int firstIdleTimeoutSeconds: IdleModel.firstTimeout(screensaverEnabled, screensaverTimeoutSeconds, lockEnabled, lockTimeoutSeconds)
   readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
@@ -144,10 +145,12 @@ Item {
   property string lastEventAt: ""
   property string lastStandbyAt: ""
   property string lastSuspendAt: ""
-  // From the hibernate probe: logind's CanSuspendThenHibernate answer, the
-  // configured HibernateDelaySec= ("" when unset) and whether there is a
-  // battery. hibernateWhen is when the machine hibernates, as text.
-  property bool hibernateAvailable: false
+  // From the hibernate probe: logind's CanHibernate and
+  // CanSuspendThenHibernate answers, the configured HibernateDelaySec= (""
+  // when unset) and whether there is a battery. hibernateWhen is when
+  // suspend-then-hibernate hibernates, as text.
+  property bool canHibernate: false
+  property bool canSuspendThenHibernate: false
   property string hibernateDelay: ""
   property bool hasBattery: false
   property var hibernateProbeResult: ({})
@@ -560,16 +563,20 @@ Item {
 
   // Suspend is asked of logind directly: the org.freedesktop.login1 Suspend
   // call, which is what Omarchy's own Suspend menu entry ends up making too.
-  // With suspendThenHibernate on it is SuspendThenHibernate instead, asked
+  // The other modes call Hibernate or SuspendThenHibernate instead, asked
   // again at the moment of the call, so a system where hibernation has gone
-  // since the last probe still suspends. How long the machine stays suspended
-  // is systemd's HibernateDelaySec=, which only root can set.
+  // since the last probe still suspends. How long suspend-then-hibernate
+  // stays suspended is systemd's HibernateDelaySec=, which only root can set.
   readonly property string logindCall: "busctl call org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager"
-  readonly property string suspendCommand: root.suspendThenHibernate
-    ? "if [ \"$(" + root.logindCall + " CanSuspendThenHibernate)\" = 's \"yes\"' ]; then "
-      + root.logindCall + " SuspendThenHibernate b true; else " + root.logindCall + " Suspend b true; fi"
-    : root.logindCall + " Suspend b true"
-  readonly property string hibernateProbeCommand: root.logindCall + " CanSuspendThenHibernate 2>/dev/null | sed -n 's/^s \"\\(.*\\)\"$/can=\\1/p'; "
+  readonly property string suspendCommand: {
+    var method = IdleModel.SLEEP_METHODS[root.suspendMode]
+    var plain = root.logindCall + " Suspend b true"
+    if (method === "Suspend") return plain
+    return "if [ \"$(" + root.logindCall + " Can" + method + ")\" = 's \"yes\"' ]; then "
+      + root.logindCall + " " + method + " b true; else " + plain + "; fi"
+  }
+  readonly property string hibernateProbeCommand: root.logindCall + " CanHibernate 2>/dev/null | sed -n 's/^s \"\\(.*\\)\"$/hibernate=\\1/p'; "
+    + root.logindCall + " CanSuspendThenHibernate 2>/dev/null | sed -n 's/^s \"\\(.*\\)\"$/then=\\1/p'; "
     + "systemd-analyze cat-config systemd/sleep.conf 2>/dev/null | sed -n 's/^[[:space:]]*HibernateDelaySec=[[:space:]]*/delay=/p' | tail -n 1; "
     + "for t in /sys/class/power_supply/*/type; do [ \"$(cat \"$t\" 2>/dev/null)\" = Battery ] && { echo battery=yes; break; }; done; true"
 
@@ -589,17 +596,23 @@ Item {
 
   function applyHibernateProbe() {
     var result = root.hibernateProbeResult
-    root.hibernateAvailable = result.can === "yes"
+    root.canHibernate = result.hibernate === "yes"
+    root.canSuspendThenHibernate = result.then === "yes"
     root.hibernateDelay = result.delay || ""
     root.hasBattery = result.battery === "yes"
   }
 
-  function setSuspendThenHibernate(value) {
-    var enabled = !!value
-    if (root.suspendThenHibernate === enabled) return true
-    return mutateIdleConfig("suspendThenHibernate " + (enabled ? "on" : "off"), function(idle) {
-      idle.suspendThenHibernate = enabled
-    })
+  // { mode: bool } for IdleModel.nextSleepMode and the panel.
+  readonly property var sleepModesAvailable: ({
+    "suspend": true,
+    "suspend-then-hibernate": root.canSuspendThenHibernate,
+    "hibernate": root.canHibernate
+  })
+
+  function setSuspendMode(mode) {
+    if (IdleModel.SLEEP_MODES.indexOf(String(mode)) === -1) return false
+    if (root.suspendMode === mode) return true
+    return mutateIdleConfig("suspendMode=" + mode, function(idle) { idle.suspendMode = mode })
   }
 
   function suspendSystem(reason) {
@@ -667,12 +680,12 @@ Item {
         lock: stageJson("lock"),
         suspend: stageJson("suspend")
       },
-      suspendThenHibernate: {
-        enabled: root.suspendThenHibernate,
-        available: root.hibernateAvailable,
-        delay: root.hibernateDelay,
+      suspendMode: {
+        mode: root.suspendMode,
+        available: root.sleepModesAvailable,
+        hibernateDelay: root.hibernateDelay,
         battery: root.hasBattery,
-        when: root.hibernateWhen
+        hibernateWhen: root.hibernateWhen
       },
       idle: root.cycleIdle,
       standbyIdle: root.standbyIdle,
@@ -1245,13 +1258,13 @@ Item {
       return "ok"
     }
 
-    // omarchy-shell idle suspendThenHibernate [on|off|toggle|status]
-    function suspendThenHibernate(action: string): string {
-      var act = String(action || "status")
-      if (act === "on" || act === "off") root.setSuspendThenHibernate(act === "on")
-      else if (act === "toggle") root.setSuspendThenHibernate(!root.suspendThenHibernate)
-      else if (act !== "status") return "unknown action: " + act
-      return (root.suspendThenHibernate ? "on" : "off") + (root.hibernateAvailable ? "" : " (hibernation not available)")
+    // omarchy-shell idle suspendMode [suspend|suspend-then-hibernate|hibernate]
+    function suspendMode(mode: string): string {
+      var wanted = String(mode || "")
+      if (wanted === "") return root.suspendMode
+      if (IdleModel.SLEEP_MODES.indexOf(wanted) === -1) return "unknown mode: " + wanted
+      if (!root.setSuspendMode(wanted)) return "not written"
+      return root.sleepModesAvailable[wanted] ? "ok" : "ok (not available here, suspends instead)"
     }
 
     // omarchy-shell idle standby  → monitors off now

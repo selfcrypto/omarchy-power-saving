@@ -45,11 +45,22 @@ Panel {
   function setStageEnabled(key, value) { if (ready) svc.setStageEnabled(key, value) }
   function setStageMinutes(key, minutes) { return ready && svc.setStageTimeout(key, Math.max(1, minutes) * 60) }
   function toggleStage(key) { setStageEnabled(key, !stageEnabled(key)) }
-  // Suspend-then-hibernate: offered only where logind can do it.
-  readonly property bool hibernateAvailable: ready && svc.hibernateAvailable
-  readonly property bool thenHibernate: ready && svc.suspendThenHibernate
+  // What the suspend stage does. The hibernate modes are offered only where
+  // logind can do them; a mode set before it went away stays shown.
+  readonly property string suspendMode: ready ? svc.suspendMode : "suspend"
+  readonly property var sleepModesAvailable: ready ? svc.sleepModesAvailable : ({ "suspend": true })
   readonly property string hibernateWhen: ready ? svc.hibernateWhen : ""
-  function toggleThenHibernate() { if (hibernateAvailable) svc.setSuspendThenHibernate(!thenHibernate) }
+  readonly property var sleepModeOptions: {
+    var list = []
+    for (var i = 0; i < IdleModel.SLEEP_MODES.length; i++) {
+      var mode = IdleModel.SLEEP_MODES[i]
+      if (sleepModesAvailable[mode] || mode === suspendMode) list.push({ value: mode, label: IdleModel.SLEEP_LABELS[mode] })
+    }
+    return list
+  }
+  readonly property bool showSleepModes: sleepModeOptions.length > 1
+  function setSuspendMode(mode) { if (ready) svc.setSuspendMode(mode) }
+  function nextSuspendMode() { if (showSleepModes) setSuspendMode(IdleModel.nextSleepMode(suspendMode, sleepModesAvailable)) }
   function togglePowerSaving() { if (ready) svc.setIdleEnabled(root.stayAwake) }
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
@@ -243,61 +254,57 @@ Panel {
     }
   }
 
-  // Under the suspend row: suspend through SuspendThenHibernate. The delay
-  // is systemd's (HibernateDelaySec=), shown here and set only by root.
-  component HibernateRow: Rectangle {
-    id: hibernateRow
-    readonly property bool suspendOn: root.stageEnabled("suspend")
+  // Under the suspend row: what the stage does, suspend, suspend then
+  // hibernate, or hibernate. The suspend-then-hibernate delay is systemd's
+  // (HibernateDelaySec=), shown here and set only by root.
+  component SleepModeRow: Rectangle {
+    id: modeRow
     width: parent ? parent.width : 0
-    height: Math.max(Style.space(36), hibernateLayout.implicitHeight + Style.space(8))
+    height: modeColumn.implicitHeight + Style.space(10)
     radius: Style.cornerRadius
-    color: hibernateMouse.containsMouse || hibernateSwitch.containsMouse ? root.hoverFill : "transparent"
+    color: "transparent"
 
-    MouseArea {
-      id: hibernateMouse
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.NoButton
-    }
-
-    RowLayout {
-      id: hibernateLayout
-      anchors.fill: parent
+    Column {
+      id: modeColumn
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
       anchors.leftMargin: Style.space(8) + Style.space(30) + Style.space(8)
       anchors.rightMargin: Style.space(10)
-      spacing: Style.space(8)
+      spacing: Style.space(4)
 
-      Text {
-        text: "Then hibernate"
-        color: root.thenHibernate && hibernateRow.suspendOn ? root.foreground : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
+      RowLayout {
+        width: parent.width
+        spacing: Style.space(8)
+
+        ButtonGroup {
+          options: root.sleepModeOptions
+          value: root.suspendMode
+          focusable: false
+          spacing: Style.space(4)
+          foreground: root.foreground
+          accent: root.accent
+          fontFamily: root.fontFamily
+          fontSize: Style.font.caption
+          onChanged: function(mode) { root.setSuspendMode(mode) }
+        }
+
+        Item { Layout.fillWidth: true }
+
+        KeyCap { label: "h" }
       }
 
       Text {
+        visible: root.suspendMode !== "suspend"
+        width: parent.width
         textFormat: Text.PlainText
-        text: root.hibernateWhen
+        text: !root.sleepModesAvailable[root.suspendMode] ? "Not available here; suspends instead"
+          : (root.suspendMode === "hibernate" ? "Saves memory to disk and powers off"
+          : "Hibernates " + root.hibernateWhen + " (systemd HibernateDelaySec=)")
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
-        elide: Text.ElideRight
-        Layout.fillWidth: true
-      }
-
-      KeyCap { label: "h" }
-
-      ToggleSwitch {
-        id: hibernateSwitch
-        checked: root.thenHibernate
-        interactive: root.hibernateAvailable
-        foreground: root.foreground
-        onToggled: root.toggleThenHibernate()
-
-        PanelToolTip {
-          visible: hibernateSwitch.containsMouse
-          text: "Suspend, then hibernate " + root.hibernateWhen + ". The delay is systemd's HibernateDelaySec="
-          fontFamily: root.fontFamily
-        }
+        wrapMode: Text.WordWrap
       }
     }
   }
@@ -341,8 +348,8 @@ Panel {
   }
 
   Component {
-    id: hibernateRowComponent
-    HibernateRow {}
+    id: sleepModeRowComponent
+    SleepModeRow {}
   }
 
   BarIconButton {
@@ -404,7 +411,7 @@ Panel {
         else if (t === "o" || t === "O" || t === "r" || t === "R") keyCatcher.pendingKey = t.toLowerCase()
         else if (t === "k" || t === "K") root.lockNow()
         else if (t === "s" || t === "S") root.suspendNow()
-        else if ((t === "h" || t === "H") && root.hibernateAvailable) root.toggleThenHibernate()
+        else if ((t === "h" || t === "H") && root.showSleepModes) root.nextSuspendMode()
         else return
         event.accepted = true
       }
@@ -482,7 +489,7 @@ Panel {
           StageGroup {
             title: "System"
             entries: root.systemStages
-            footer: root.hibernateAvailable ? hibernateRowComponent : null
+            footer: root.showSleepModes ? sleepModeRowComponent : null
           }
 
           PanelSeparator { width: parent.width; foreground: root.foreground }

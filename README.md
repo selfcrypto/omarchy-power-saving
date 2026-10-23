@@ -112,7 +112,7 @@ Keys in the panel:
 | `o` | Standby now |
 | `k` | Lock now |
 | `s` | Suspend now |
-| `h` | Then hibernate on or off (when available) |
+| `h` | Next suspend mode (when hibernation is available) |
 
 Keys in a minutes stepper, once it has been clicked:
 
@@ -163,17 +163,19 @@ Suspend:
 - Goes through logind and needs no privileges.
 - Idle inhibitors are respected.
 
-Then hibernate:
+Suspend mode, chosen under the suspend row:
 
-- An option under the suspend row: suspend through logind's
-  `SuspendThenHibernate` instead of `Suspend`. The machine suspends, wakes on
-  an RTC alarm and hibernates. Useful on a laptop left on battery.
-- Shown only when logind can do it, which needs hibernation set up (on
-  Omarchy: `omarchy-hibernation-setup`). If hibernation has gone by the time
-  the machine suspends, it just suspends.
-- When it hibernates is systemd's setting, shown beside the switch:
+- Suspend: logind's `Suspend`, the default.
+- Then hibernate: logind's `SuspendThenHibernate`. The machine suspends,
+  wakes on an RTC alarm and hibernates. Useful on a laptop left on battery.
+  When it hibernates is systemd's setting, shown under the choice:
   `HibernateDelaySec=` in `/etc/systemd/sleep.conf.d/` (root). Unset, a
   machine with a battery hibernates at 5% battery and one without after 2 h.
+- Hibernate: logind's `Hibernate`. Memory is written to disk and the machine
+  powers off.
+- The two hibernate modes are shown only when logind can do them, which needs
+  hibernation set up (on Omarchy: `omarchy-hibernation-setup`). If
+  hibernation has gone by the time the stage fires, the machine suspends.
 - Applies to "suspend now" as well.
 
 All four timeouts count from the moment you went idle. Starting the
@@ -212,7 +214,7 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
 | `standbyEnabled` | Standby stage on or off | `false` |
 | `lockEnabled` | Lock stage on or off | `true` |
 | `suspendEnabled` | Suspend stage on or off | `false` |
-| `suspendThenHibernate` | Suspend, then hibernate | `false` |
+| `suspendMode` | `suspend`, `suspend-then-hibernate` or `hibernate` | `suspend` |
 
 The minimum timeout is 10 seconds. The panel and the IPC `timeout` call keep
 the order within a group described above; values written to `shell.json` by
@@ -241,7 +243,8 @@ omarchy-shell idle screensaver                  # screensaver now
 omarchy-shell idle standby                      # monitors off now
 omarchy-shell idle wake                         # monitors on now
 omarchy-shell idle suspend                      # suspend now
-omarchy-shell idle suspendThenHibernate on      # on | off | toggle | status
+omarchy-shell idle suspendMode hibernate        # suspend | suspend-then-hibernate | hibernate
+omarchy-shell idle suspendMode ""               # print the current mode
 omarchy-shell idle enable | disable | toggle    # stay awake, as in the stock service
 ```
 

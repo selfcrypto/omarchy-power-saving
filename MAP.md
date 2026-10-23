@@ -23,7 +23,7 @@ grep it). This file says what each file is for and where to go for a kind of cha
 
 | File | Role |
 |---|---|
-| `Service.qml` | Loaded once by the shell: idle monitors, stage timers, screensaver, DPMS standby, lock, suspend (then hibernate), stay awake, config writes, IPC |
+| `Service.qml` | Loaded once by the shell: idle monitors, stage timers, screensaver, DPMS standby, lock, suspend (or hibernate), stay awake, config writes, IPC |
 | `Panel.qml` | Bar icon and panel, one per monitor; reads and calls the service only |
 | `IdleSchedule.qml` | The stages as dots in firing order; a click switches a stage |
 | `MinutesField.qml` | Minutes spin box with −/+ buttons and key-by-key digit entry |

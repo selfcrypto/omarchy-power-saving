@@ -74,7 +74,22 @@ test("when suspend-then-hibernate hibernates", () => {
   assert.strictEqual(M.hibernateWhenText("garbage", false), "after 2 h")
 })
 
-test("the hibernate switch is carried on every write", () => {
-  const out = M.stageSettingsFor({}, { suspendThenHibernate: true })
-  assert.strictEqual(out.suspendThenHibernate, true)
+test("the suspend mode is carried on every write", () => {
+  const out = M.stageSettingsFor({}, { suspendMode: "hibernate" })
+  assert.strictEqual(out.suspendMode, "hibernate")
+})
+
+test("an unknown suspend mode is plain suspend", () => {
+  assert.strictEqual(M.sleepModeFromConfig("hibernate"), "hibernate")
+  assert.strictEqual(M.sleepModeFromConfig("hybrid-sleep"), "suspend")
+  assert.strictEqual(M.sleepModeFromConfig(undefined), "suspend")
+})
+
+test("the h key steps through the available modes only", () => {
+  const both = { "suspend-then-hibernate": true, hibernate: true }
+  assert.strictEqual(M.nextSleepMode("suspend", both), "suspend-then-hibernate")
+  assert.strictEqual(M.nextSleepMode("suspend-then-hibernate", both), "hibernate")
+  assert.strictEqual(M.nextSleepMode("hibernate", both), "suspend")
+  assert.strictEqual(M.nextSleepMode("suspend", { hibernate: true }), "hibernate")
+  assert.strictEqual(M.nextSleepMode("suspend", {}), "suspend")
 })

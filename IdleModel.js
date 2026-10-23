@@ -136,6 +136,27 @@ function summaryText(stages) {
 
 // ------------------------------------------------------------- hibernate
 
+// What the suspend stage asks of logind, by systemctl verb, and the logind
+// method for each.
+var SLEEP_MODES = ["suspend", "suspend-then-hibernate", "hibernate"]
+var SLEEP_METHODS = { suspend: "Suspend", "suspend-then-hibernate": "SuspendThenHibernate", hibernate: "Hibernate" }
+var SLEEP_LABELS = { suspend: "Suspend", "suspend-then-hibernate": "Then hibernate", hibernate: "Hibernate" }
+
+function sleepModeFromConfig(value) {
+  return SLEEP_MODES.indexOf(String(value)) !== -1 ? String(value) : "suspend"
+}
+
+// The mode after `mode` among those `available` ({ mode: bool }) has on;
+// plain suspend always is.
+function nextSleepMode(mode, available) {
+  var at = SLEEP_MODES.indexOf(mode)
+  for (var step = 1; step <= SLEEP_MODES.length; step++) {
+    var next = SLEEP_MODES[(at + step) % SLEEP_MODES.length]
+    if (next === "suspend" || (available && available[next])) return next
+  }
+  return "suspend"
+}
+
 var TIMESPAN_UNITS = {
   us: 0.000001, usec: 0.000001, ms: 0.001, msec: 0.001,
   s: 1, sec: 1, second: 1, seconds: 1,
@@ -180,7 +201,7 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "suspendThenHibernate"]
+var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "suspendMode"]
 
 // Inline settings of one bar entry (`{ id, ...settings }` in bar.layout.*),
 // without the id; {} when the entry is absent, so reads fall back.
@@ -243,6 +264,11 @@ if (typeof module !== "undefined") {
     summaryText: summaryText,
     timespanSeconds: timespanSeconds,
     hibernateWhenText: hibernateWhenText,
+    SLEEP_MODES: SLEEP_MODES,
+    SLEEP_METHODS: SLEEP_METHODS,
+    SLEEP_LABELS: SLEEP_LABELS,
+    sleepModeFromConfig: sleepModeFromConfig,
+    nextSleepMode: nextSleepMode,
     isObject: isObject,
     STAGE_KEYS: STAGE_KEYS,
     barEntrySettings: barEntrySettings,
