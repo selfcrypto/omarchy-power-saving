@@ -633,12 +633,13 @@ Item {
     sleepSystem("hibernate", root.logindCall + " Hibernate b true", hibernateProcess, reason)
   }
 
-  // It modifies suspend, so it is only switched on while suspend is on;
-  // switching it off always works.
+  // It modifies suspend, so switching it on switches suspend on too, in the
+  // same write.
   function setSuspendThenHibernate(value) {
     var enabled = !!value
     if (root.suspendThenHibernate === enabled) return true
-    if (enabled && !stageEnabled("suspend")) return false
+    if (enabled && !stageEnabled("suspend"))
+      return setGatedStage("suspend", true, function(idle) { idle.suspendThenHibernate = true })
     return mutateIdleConfig("suspendThenHibernate " + (enabled ? "on" : "off"), function(idle) {
       idle.suspendThenHibernate = enabled
     })
@@ -899,7 +900,8 @@ Item {
   // Standby, lock, suspend and hibernate: switch and timeout in one config write, since
   // a second write would start from config that has not reloaded yet.
   // Turning suspend or hibernate on turns the other off in the same write.
-  function setGatedStage(name, enabled) {
+  // `extra`, when given, changes more keys in the same write.
+  function setGatedStage(name, enabled, extra) {
     var seconds = enabled ? timeoutWhenEnabled(name) : stageTimeout(name)
     var other = enabled ? IdleModel.exclusiveWith(name) : ""
     var otherWasOn = other !== "" && stageEnabled(other)
@@ -907,6 +909,7 @@ Item {
       idle[name + "Enabled"] = enabled
       idle[name] = seconds
       if (other !== "") idle[other + "Enabled"] = false
+      if (extra) extra(idle)
     })
     if (!written) return false
     var notes = []

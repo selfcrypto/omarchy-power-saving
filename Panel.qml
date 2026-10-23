@@ -299,8 +299,6 @@ Panel {
     width: parent ? parent.width : 0
     height: thenLayout.implicitHeight + Style.space(10)
 
-    // A switch that cannot be clicked gets no hover of its own.
-    HoverHandler { id: thenHover }
 
     RowLayout {
       id: thenLayout
@@ -339,14 +337,13 @@ Panel {
       ToggleSwitch {
         id: thenSwitch
         checked: root.thenHibernate
-        // On only with suspend on; off always, so a leftover can be cleared.
-        interactive: root.ready && (root.thenHibernate || root.stageEnabled("suspend"))
+        interactive: root.ready
         foreground: root.foreground
         onToggled: root.toggleThenHibernate()
 
         PanelToolTip {
-          visible: thenHover.hovered
-          text: !root.thenHibernate && !root.stageEnabled("suspend") ? "Turn Suspend on first" : root.hibernateDelayHint
+          visible: thenSwitch.containsMouse
+          text: root.hibernateDelayHint
           fontFamily: root.fontFamily
         }
       }

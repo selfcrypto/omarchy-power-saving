@@ -41,8 +41,8 @@ Budget 15 KB.
 
 ## Done
 
-- **2026-10-23.** "Then hibernate" could be switched on with suspend off (found by Kike). Now only
-  while suspend is on, in the panel and over IPC; switching it off always works.
+- **2026-10-23.** "Then hibernate" could be switched on with suspend off (found by Kike). Switching it
+  on now switches suspend on too (and so hibernate off), in one write.
 
 - **2026-10-23.** A screensaver open when the service starts is adopted, so input closes it.
 
