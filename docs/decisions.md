@@ -68,3 +68,8 @@ Titles are never changed once cited from another file.
 **Decision.** `cancelIdleCycle` no longer forgets the screensaver windows; they are forgotten when they close or when the service closes them (`stopScreensaver`, standby, lock).
 **Why.** Stay awake switching on while the screensaver was up (Claude's hooks did it every few minutes) cancelled the cycle and forgot windows that stayed on screen. Mouse movement then woke the monitors but left the screensaver, which only a key press closed. The next cycle's launch found it running and added nothing. Reported by Kike twice on 2026-10-22.
 **Alternative rejected.** Closing the screensaver when stay awake switches on: hides it from someone who is away for no reason the user caused.
+
+## 2026-10-23 · Then hibernate through logind, delay left to systemd
+**Decision.** An option on the suspend stage calls logind's `SuspendThenHibernate`. It is shown only when `CanSuspendThenHibernate` answers `yes`, and the call checks again at suspend time, falling back to `Suspend`. The panel shows when the machine hibernates, read from `HibernateDelaySec=` and the presence of a battery; the plugin never sets it.
+**Why.** Kike asked for hibernation after a time suspended, for laptops. logind already wakes on an RTC alarm and hibernates; the delay lives in `/etc/systemd/sleep.conf.d/`, root only, and the D-Bus call takes no delay.
+**Alternative rejected.** Own RTC wake (`rtcwake`, `/sys/class/rtc/*/wakealarm`): needs root. A delay setting in the plugin: it could not be applied.

@@ -91,6 +91,9 @@ Item {
   readonly property bool lockEnabled: IdleModel.boolFromConfig(stageConfig.lockEnabled, true)
   readonly property bool standbyEnabled: IdleModel.boolFromConfig(stageConfig.standbyEnabled, false)
   readonly property bool suspendEnabled: IdleModel.boolFromConfig(stageConfig.suspendEnabled, false)
+  // Suspend through logind's SuspendThenHibernate instead of Suspend. Used
+  // only while logind says it can (hibernateAvailable); otherwise plain suspend.
+  readonly property bool suspendThenHibernate: IdleModel.boolFromConfig(stageConfig.suspendThenHibernate, false)
   readonly property bool screensaverEnabled: screensaverToggleLoaded && !screensaverOff
   readonly property int firstIdleTimeoutSeconds: IdleModel.firstTimeout(screensaverEnabled, screensaverTimeoutSeconds, lockEnabled, lockTimeoutSeconds)
   readonly property int screensaverDelaySeconds: Math.max(0, screensaverTimeoutSeconds - firstIdleTimeoutSeconds)
@@ -141,6 +144,14 @@ Item {
   property string lastEventAt: ""
   property string lastStandbyAt: ""
   property string lastSuspendAt: ""
+  // From the hibernate probe: logind's CanSuspendThenHibernate answer, the
+  // configured HibernateDelaySec= ("" when unset) and whether there is a
+  // battery. hibernateWhen is when the machine hibernates, as text.
+  property bool hibernateAvailable: false
+  property string hibernateDelay: ""
+  property bool hasBattery: false
+  property var hibernateProbeResult: ({})
+  readonly property string hibernateWhen: IdleModel.hibernateWhenText(hibernateDelay, hasBattery)
   // Set when turning a stage on moved its timeout to keep the group order;
   // the panel shows it for a few seconds.
   property string orderNote: ""
@@ -549,7 +560,47 @@ Item {
 
   // Suspend is asked of logind directly: the org.freedesktop.login1 Suspend
   // call, which is what Omarchy's own Suspend menu entry ends up making too.
-  readonly property string suspendCommand: "busctl call org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager Suspend b true"
+  // With suspendThenHibernate on it is SuspendThenHibernate instead, asked
+  // again at the moment of the call, so a system where hibernation has gone
+  // since the last probe still suspends. How long the machine stays suspended
+  // is systemd's HibernateDelaySec=, which only root can set.
+  readonly property string logindCall: "busctl call org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager"
+  readonly property string suspendCommand: root.suspendThenHibernate
+    ? "if [ \"$(" + root.logindCall + " CanSuspendThenHibernate)\" = 's \"yes\"' ]; then "
+      + root.logindCall + " SuspendThenHibernate b true; else " + root.logindCall + " Suspend b true; fi"
+    : root.logindCall + " Suspend b true"
+  readonly property string hibernateProbeCommand: root.logindCall + " CanSuspendThenHibernate 2>/dev/null | sed -n 's/^s \"\\(.*\\)\"$/can=\\1/p'; "
+    + "systemd-analyze cat-config systemd/sleep.conf 2>/dev/null | sed -n 's/^[[:space:]]*HibernateDelaySec=[[:space:]]*/delay=/p' | tail -n 1; "
+    + "for t in /sys/class/power_supply/*/type; do [ \"$(cat \"$t\" 2>/dev/null)\" = Battery ] && { echo battery=yes; break; }; done; true"
+
+  // Asked at start and each time the panel opens, since hibernation can be
+  // set up or removed while the shell runs.
+  function refreshHibernate() {
+    if (hibernateProbe.running) return
+    root.hibernateProbeResult = ({})
+    hibernateProbe.running = true
+  }
+
+  function applyHibernateProbeLine(line) {
+    var text = String(line)
+    var at = text.indexOf("=")
+    if (at > 0) root.hibernateProbeResult[text.slice(0, at)] = text.slice(at + 1).trim()
+  }
+
+  function applyHibernateProbe() {
+    var result = root.hibernateProbeResult
+    root.hibernateAvailable = result.can === "yes"
+    root.hibernateDelay = result.delay || ""
+    root.hasBattery = result.battery === "yes"
+  }
+
+  function setSuspendThenHibernate(value) {
+    var enabled = !!value
+    if (root.suspendThenHibernate === enabled) return true
+    return mutateIdleConfig("suspendThenHibernate " + (enabled ? "on" : "off"), function(idle) {
+      idle.suspendThenHibernate = enabled
+    })
+  }
 
   function suspendSystem(reason) {
     logEvent("suspend-system", reason || "requested")
@@ -615,6 +666,13 @@ Item {
         standby: stageJson("standby"),
         lock: stageJson("lock"),
         suspend: stageJson("suspend")
+      },
+      suspendThenHibernate: {
+        enabled: root.suspendThenHibernate,
+        available: root.hibernateAvailable,
+        delay: root.hibernateDelay,
+        battery: root.hasBattery,
+        when: root.hibernateWhen
       },
       idle: root.cycleIdle,
       standbyIdle: root.standbyIdle,
@@ -1039,6 +1097,14 @@ Item {
     id: suspendProcess
     onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "suspend exitCode=" + exitCode + " status=" + exitStatus) }
   }
+  Process {
+    id: hibernateProbe
+    command: ["bash", "-c", root.hibernateProbeCommand]
+    stdout: SplitParser {
+      onRead: function(line) { root.applyHibernateProbeLine(line) }
+    }
+    onExited: function() { root.applyHibernateProbe() }
+  }
 
   Process {
     id: stayAwakeStateProbe
@@ -1113,6 +1179,7 @@ Item {
     syncMonitors()
     refreshStayAwakeState()
     refreshScreensaverToggle()
+    refreshHibernate()
   }
 
   // Same target as omarchy.idle so `omarchy-shell idle …` keeps working.
@@ -1167,6 +1234,15 @@ Item {
     function suspend(): string {
       root.suspendSystem("ipc")
       return "ok"
+    }
+
+    // omarchy-shell idle suspendThenHibernate [on|off|toggle|status]
+    function suspendThenHibernate(action: string): string {
+      var act = String(action || "status")
+      if (act === "on" || act === "off") root.setSuspendThenHibernate(act === "on")
+      else if (act === "toggle") root.setSuspendThenHibernate(!root.suspendThenHibernate)
+      else if (act !== "status") return "unknown action: " + act
+      return (root.suspendThenHibernate ? "on" : "off") + (root.hibernateAvailable ? "" : " (hibernation not available)")
     }
 
     // omarchy-shell idle standby  → monitors off now

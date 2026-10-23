@@ -45,6 +45,11 @@ Panel {
   function setStageEnabled(key, value) { if (ready) svc.setStageEnabled(key, value) }
   function setStageMinutes(key, minutes) { return ready && svc.setStageTimeout(key, Math.max(1, minutes) * 60) }
   function toggleStage(key) { setStageEnabled(key, !stageEnabled(key)) }
+  // Suspend-then-hibernate: offered only where logind can do it.
+  readonly property bool hibernateAvailable: ready && svc.hibernateAvailable
+  readonly property bool thenHibernate: ready && svc.suspendThenHibernate
+  readonly property string hibernateWhen: ready ? svc.hibernateWhen : ""
+  function toggleThenHibernate() { if (hibernateAvailable) svc.setSuspendThenHibernate(!thenHibernate) }
   function togglePowerSaving() { if (ready) svc.setIdleEnabled(root.stayAwake) }
   function lockNow() { if (!ready) return; root.close(); svc.lockSystem("panel") }
   function suspendNow() { if (!ready) return; root.close(); svc.suspendSystem("panel") }
@@ -105,6 +110,7 @@ Panel {
   onOpenedChanged: {
     keyCatcher.pendingKey = ""
     if (opened) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+    if (opened && ready) svc.refreshHibernate()
   }
 
   // A key as printed on the keyboard, for the keys the panel answers to.
@@ -237,10 +243,71 @@ Panel {
     }
   }
 
+  // Under the suspend row: suspend through SuspendThenHibernate. The delay
+  // is systemd's (HibernateDelaySec=), shown here and set only by root.
+  component HibernateRow: Rectangle {
+    id: hibernateRow
+    readonly property bool suspendOn: root.stageEnabled("suspend")
+    width: parent ? parent.width : 0
+    height: Math.max(Style.space(36), hibernateLayout.implicitHeight + Style.space(8))
+    radius: Style.cornerRadius
+    color: hibernateMouse.containsMouse || hibernateSwitch.containsMouse ? root.hoverFill : "transparent"
+
+    MouseArea {
+      id: hibernateMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+    }
+
+    RowLayout {
+      id: hibernateLayout
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(8) + Style.space(30) + Style.space(8)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Text {
+        text: "Then hibernate"
+        color: root.thenHibernate && hibernateRow.suspendOn ? root.foreground : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+      }
+
+      Text {
+        textFormat: Text.PlainText
+        text: root.hibernateWhen
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        elide: Text.ElideRight
+        Layout.fillWidth: true
+      }
+
+      KeyCap { label: "h" }
+
+      ToggleSwitch {
+        id: hibernateSwitch
+        checked: root.thenHibernate
+        interactive: root.hibernateAvailable
+        foreground: root.foreground
+        onToggled: root.toggleThenHibernate()
+
+        PanelToolTip {
+          visible: hibernateSwitch.containsMouse
+          text: "Suspend, then hibernate " + root.hibernateWhen + ". The delay is systemd's HibernateDelaySec="
+          fontFamily: root.fontFamily
+        }
+      }
+    }
+  }
+
   component StageGroup: Column {
     id: group
     required property string title
     required property var entries
+    // Shown at the bottom of the group's card, when set.
+    property Component footer: null
     width: parent ? parent.width : 0
     spacing: Style.space(6)
 
@@ -264,8 +331,18 @@ Panel {
           model: group.entries
           delegate: StageRow {}
         }
+        Loader {
+          width: parent.width
+          active: group.footer !== null
+          sourceComponent: group.footer
+        }
       }
     }
+  }
+
+  Component {
+    id: hibernateRowComponent
+    HibernateRow {}
   }
 
   BarIconButton {
@@ -327,6 +404,7 @@ Panel {
         else if (t === "o" || t === "O" || t === "r" || t === "R") keyCatcher.pendingKey = t.toLowerCase()
         else if (t === "k" || t === "K") root.lockNow()
         else if (t === "s" || t === "S") root.suspendNow()
+        else if ((t === "h" || t === "H") && root.hibernateAvailable) root.toggleThenHibernate()
         else return
         event.accepted = true
       }
@@ -404,6 +482,7 @@ Panel {
           StageGroup {
             title: "System"
             entries: root.systemStages
+            footer: root.hibernateAvailable ? hibernateRowComponent : null
           }
 
           PanelSeparator { width: parent.width; foreground: root.foreground }

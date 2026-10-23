@@ -27,6 +27,11 @@ Budget 15 KB.
    writes switch and timeout of one stage together. Fix: keep a pending entry in the service and
    apply each mutation onto it until the reload matches. Found by the Fable review, 2026-10-22.
 
+5. Branch `suspend-then-hibernate` (not pushed): "Then hibernate" option under suspend. Unit tests,
+   lint and the live panel checked; the logind call was dry-run, no real hibernate yet. A real one
+   writes RAM to the swapfile on the NVMe: only with Kike's go-ahead, after closing what is open.
+   Releases as 1.6.0 after #12622 is approved.
+
 ## Standing facts
 
 - The unlock-screen blank delay is in the cloned lock plugin `~/.config/omarchy/plugins/kike.lock`, not here.

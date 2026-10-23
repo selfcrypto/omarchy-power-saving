@@ -54,3 +54,27 @@ test("summaryText lists stages that are on, in firing order", () => {
     { key: "screensaver", enabled: true, seconds: 120 }]
   assert.strictEqual(M.summaryText(list), "Screensaver 2 min → Lock 10 min")
 })
+
+test("systemd time spans", () => {
+  assert.strictEqual(M.timespanSeconds("2h"), 7200)
+  assert.strictEqual(M.timespanSeconds("1h 30min"), 5400)
+  assert.strictEqual(M.timespanSeconds("1h30min"), 5400)
+  assert.strictEqual(M.timespanSeconds("90"), 90)
+  assert.strictEqual(M.timespanSeconds("45 min"), 2700)
+  assert.strictEqual(M.timespanSeconds(""), -1)
+  assert.strictEqual(M.timespanSeconds("soon"), -1)
+  assert.strictEqual(M.timespanSeconds("2 fortnights"), -1)
+})
+
+test("when suspend-then-hibernate hibernates", () => {
+  assert.strictEqual(M.hibernateWhenText("", false), "after 2 h")
+  assert.strictEqual(M.hibernateWhenText("", true), "at 5% battery")
+  assert.strictEqual(M.hibernateWhenText("45min", false), "after 45 min")
+  assert.strictEqual(M.hibernateWhenText("3h", true), "after 3 h or at 5% battery")
+  assert.strictEqual(M.hibernateWhenText("garbage", false), "after 2 h")
+})
+
+test("the hibernate switch is carried on every write", () => {
+  const out = M.stageSettingsFor({}, { suspendThenHibernate: true })
+  assert.strictEqual(out.suspendThenHibernate, true)
+})
