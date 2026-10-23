@@ -185,7 +185,7 @@ Then hibernate:
   `SuspendThenHibernate`: the machine suspends, then wakes and hibernates
   when systemd decides. Useful on a laptop left on battery.
 - When it hibernates is set by systemd, not by the plugin. The row, numbered
-  4.5 under suspend, shows the value in a greyed box: "2 h" (the default
+  4→5 under suspend, shows the value in a greyed box: "2 h" (the default
   without a battery), "45 min", "Low battery" or "45 min / battery" on a
   laptop. Hovering the box says where it comes from and how to change it. It is the time after suspending, not after going
   idle, and not a guaranteed deadline. Without a battery: after `HibernateDelaySec=`,

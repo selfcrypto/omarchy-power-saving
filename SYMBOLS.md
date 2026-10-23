@@ -72,7 +72,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (627 lines)
+## Panel.qml (625 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L26
 - property ready L27
@@ -118,7 +118,7 @@ Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - component KeyCap L146: A key as printed on the keyboard, for the keys the panel answers to.
 - component StageRow L169: glyph-and-name part is a button that runs the stage at once.
 - component ThenHibernateRow L284: read-only, since the plugin cannot set it, and says how to on hover.
-- component StageGroup L361
+- component StageGroup L359
 
 ## Service.qml (1400 lines)
 Power-saving idle service in five stages, each with its own switch and

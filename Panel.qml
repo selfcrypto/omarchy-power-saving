@@ -278,14 +278,14 @@ Panel {
     }
   }
 
-  // Under the suspend row, as its 4.5: suspend through logind's
+  // Under the suspend row, as its 4→5: suspend through logind's
   // SuspendThenHibernate. The box holds the delay systemd will use; it is
   // read-only, since the plugin cannot set it, and says how to on hover.
   component ThenHibernateRow: Item {
     id: thenRow
     readonly property bool isOn: root.thenHibernate && root.stageEnabled("suspend")
     width: parent ? parent.width : 0
-    height: Style.space(40)
+    height: Style.space(44)
 
     RowLayout {
       id: thenLayout
@@ -295,15 +295,14 @@ Panel {
       spacing: Style.space(8)
 
       Text {
-        text: "4.5"
+        text: "4→5"
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
-        Layout.alignment: Qt.AlignBaseline
       }
 
       Text {
-        text: "Then hibernate after"
+        text: "Hibernate after"
         color: thenRow.isOn ? root.foreground : root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
@@ -311,7 +310,6 @@ Panel {
         Layout.fillWidth: true
         Layout.maximumWidth: implicitWidth
         Layout.minimumWidth: implicitWidth
-        Layout.alignment: Qt.AlignBaseline
       }
 
       Item { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.horizontalStretchFactor: 0 }
