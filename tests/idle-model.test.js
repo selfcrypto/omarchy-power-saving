@@ -79,3 +79,28 @@ test("suspend and hibernate exclude each other", () => {
   assert.strictEqual(M.exclusiveWith("hibernate"), "suspend")
   assert.strictEqual(M.exclusiveWith("lock"), "")
 })
+
+test("systemd time spans", () => {
+  assert.strictEqual(M.timespanSeconds("2h"), 7200)
+  assert.strictEqual(M.timespanSeconds("1h 30min"), 5400)
+  assert.strictEqual(M.timespanSeconds("1h30min"), 5400)
+  assert.strictEqual(M.timespanSeconds("90"), 90)
+  assert.strictEqual(M.timespanSeconds(""), -1)
+  assert.strictEqual(M.timespanSeconds("soon"), -1)
+})
+
+test("systemd booleans", () => {
+  assert.strictEqual(M.systemdBool("no", true), false)
+  assert.strictEqual(M.systemdBool("On", false), true)
+  assert.strictEqual(M.systemdBool("", true), true)
+  assert.strictEqual(M.systemdBool("maybe", true), true)
+})
+
+test("the then-hibernate delay line", () => {
+  assert.strictEqual(M.hibernateDelayText("", false), "System delay: 2 h (default)")
+  assert.strictEqual(M.hibernateDelayText("45min", false), "System delay: 45 min")
+  assert.strictEqual(M.hibernateDelayText("45min", true), "System policy: 45 min or low battery")
+  assert.strictEqual(M.hibernateDelayText("", true), "System policy: low battery")
+  assert.ok(M.hibernateDelayHint("45min", true, false).endsWith("Delay starts after unplugging."))
+  assert.ok(!M.hibernateDelayHint("45min", false, false).includes("unplugging"))
+})

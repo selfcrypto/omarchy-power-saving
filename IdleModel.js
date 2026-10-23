@@ -144,6 +144,62 @@ function summaryText(stages) {
   return parts.join(" → ")
 }
 
+// ------------------------------------------------------------- hibernate
+
+var TIMESPAN_UNITS = {
+  us: 0.000001, usec: 0.000001, ms: 0.001, msec: 0.001,
+  s: 1, sec: 1, second: 1, seconds: 1,
+  m: 60, min: 60, minute: 60, minutes: 60,
+  h: 3600, hr: 3600, hour: 3600, hours: 3600,
+  d: 86400, day: 86400, days: 86400,
+  w: 604800, week: 604800, weeks: 604800
+}
+
+// Seconds in a systemd time span ("2h", "1h 30min", "90"; systemd.time(7)),
+// -1 when it is empty or not understood.
+function timespanSeconds(text) {
+  var rest = String(text || "").trim()
+  if (rest === "") return -1
+  var total = 0
+  var re = /^(\d+(?:\.\d+)?)\s*([a-z]*)\s*/
+  while (rest !== "") {
+    var m = re.exec(rest)
+    if (!m) return -1
+    var unit = m[2] === "" ? 1 : TIMESPAN_UNITS[m[2]]
+    if (unit === undefined) return -1
+    total += Number(m[1]) * unit
+    rest = rest.slice(m[0].length)
+  }
+  return Math.floor(total)
+}
+
+// A systemd boolean (systemd.syntax(7)); `fallback` when empty or unknown.
+function systemdBool(value, fallback) {
+  var v = String(value || "").trim().toLowerCase()
+  if (["1", "yes", "y", "true", "t", "on"].indexOf(v) !== -1) return true
+  if (["0", "no", "n", "false", "f", "off"].indexOf(v) !== -1) return false
+  return fallback
+}
+
+// When suspend-then-hibernate hibernates, from systemd-sleep.conf(5):
+// `delay` is HibernateDelaySec= ("" when unset), `onAC` HibernateOnACPower=.
+// Without a battery: after the delay, 2 h when unset. With one: at low
+// battery, or after the delay if that comes first; with HibernateOnACPower=no
+// the delay only runs on battery (said in the hint).
+function hibernateDelayText(delay, hasBattery) {
+  var seconds = timespanSeconds(delay)
+  var after = seconds > 0 ? durationText(seconds) : ""
+  if (!hasBattery) return "System delay: " + (after || "2 h (default)")
+  return "System policy: " + (after ? after + " or low battery" : "low battery")
+}
+
+// The tooltip under it: what the line is, and where the delay is set.
+function hibernateDelayHint(delay, hasBattery, onAC) {
+  var text = "System-managed timing after suspend; not a guaranteed deadline. Set by HibernateDelaySec= in /etc/systemd/sleep.conf.d/ (root)."
+  if (hasBattery && onAC === false && timespanSeconds(delay) > 0) text += " Delay starts after unplugging."
+  return text
+}
+
 // ---------------------------------------------------------------- config
 
 function isObject(value) {
@@ -213,6 +269,10 @@ if (typeof module !== "undefined") {
     firstTimeout: firstTimeout,
     durationText: durationText,
     summaryText: summaryText,
+    timespanSeconds: timespanSeconds,
+    hibernateDelayText: hibernateDelayText,
+    hibernateDelayHint: hibernateDelayHint,
+    systemdBool: systemdBool,
     isObject: isObject,
     STAGE_KEYS: STAGE_KEYS,
     barEntrySettings: barEntrySettings,

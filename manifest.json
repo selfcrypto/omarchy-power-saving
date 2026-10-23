@@ -8,7 +8,7 @@
   "omarchy": {
     "clonedFrom": "omarchy.idle"
   },
-  "description": "Four idle stages, each with its own switch and timeout: screensaver and monitor standby for the display, lock and suspend for the system. Adds the monitor standby and idle suspend that Omarchy does not have.",
+  "description": "Five idle stages, each with its own switch and timeout: screensaver and monitor standby for the display, lock and suspend for the system, and hibernate where the system supports it. Adds the monitor standby, idle suspend and hibernate that Omarchy does not have.",
   "kinds": [
     "service",
     "bar-widget"

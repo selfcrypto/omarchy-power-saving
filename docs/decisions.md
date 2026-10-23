@@ -88,3 +88,8 @@ Titles are never changed once cited from another file.
 **Decision.** Switching suspend or hibernate on switches the other off in the same write, keeping both times; both on by hand means hibernate wins. Lock comes no later than hibernate, as with suspend. Suspend-then-hibernate is a switch under the suspend row (`suspendThenHibernate`), shown where logind can, captioned "Timing managed by system"; the schedule notes "then hibernate" on the suspend stop.
 **Why.** With both on only the earlier ever fires: the machine is asleep when the later time comes. The suspend-to-hibernate delay is systemd's (`HibernateDelaySec=`, battery alarms, `HibernateOnACPower=`), root only, so the plugin cannot show an exact time. Astra's (gpt-6-astra) recommendation, accepted by Kike.
 **Alternative rejected.** Hibernate later than suspend meaning suspend-then-hibernate: changes the suspend call by moving a time, and shows a time the plugin cannot keep.
+
+## 2026-10-23 · The hibernate delay is shown, not set
+**Decision.** Under the "Then hibernate" switch the panel shows when systemd will hibernate, read from `systemd-analyze cat-config systemd/sleep.conf` (`HibernateDelaySec=`, `HibernateOnACPower=`) and whether there is a battery. Changing it is documented in the README as a root drop-in.
+**Why.** Kike could not see after how long it hibernates. The plugin runs as the user and the logind call takes no delay.
+**Alternative rejected.** A stepper writing the drop-in through a root prompt: a plugin writing `/etc`, likely refused by the marketplace security review.

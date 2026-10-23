@@ -181,9 +181,22 @@ Then hibernate:
 - A switch under the suspend row. Suspend goes through logind's
   `SuspendThenHibernate`: the machine suspends, then wakes and hibernates
   when systemd decides. Useful on a laptop left on battery.
-- The timing is systemd's (`HibernateDelaySec=` in
-  `/etc/systemd/sleep.conf.d/`, battery alarms), not the plugin's. The
-  schedule marks the suspend stop "then hibernate".
+- When it hibernates is set by systemd, not by the plugin, and the panel
+  shows it under the switch ("System delay: 2 h (default)", "System policy:
+  45 min or low battery"). It is the time after suspending, not after going
+  idle, and not a guaranteed deadline. Without a battery: after `HibernateDelaySec=`,
+  2 h when unset. With a battery: at low battery, or after
+  `HibernateDelaySec=` if that comes first (`HibernateOnACPower=no` runs the
+  delay only on battery). The schedule marks the suspend stop "then
+  hibernate".
+- To change the delay (root):
+
+  ```bash
+  sudo mkdir -p /etc/systemd/sleep.conf.d
+  printf '[Sleep]\nHibernateDelaySec=45min\n' | sudo tee /etc/systemd/sleep.conf.d/hibernate-delay.conf
+  ```
+
+  It applies from the next suspend. The panel reads it when it opens.
 - Shown where logind can do it. If it has gone by the time the machine
   suspends, it just suspends. Applies to "suspend now" too.
 

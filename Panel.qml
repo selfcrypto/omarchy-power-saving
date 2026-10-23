@@ -59,6 +59,8 @@ Panel {
   // hibernate, and kept in view while it is on so it can be turned off.
   readonly property bool thenHibernate: ready && svc.suspendThenHibernate
   readonly property bool canThenHibernate: ready && svc.canSuspendThenHibernate
+  readonly property string hibernateDelayText: ready ? svc.hibernateDelayText : ""
+  readonly property string hibernateDelayHint: ready ? svc.hibernateDelayHint : ""
   readonly property bool showThenHibernate: thenHibernate || (canThenHibernate && stageEnabled("suspend"))
   function toggleThenHibernate() { if (ready) svc.setSuspendThenHibernate(!thenHibernate) }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
@@ -284,7 +286,7 @@ Panel {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: root.canThenHibernate ? "Timing managed by system" : "Unavailable; suspends instead"
+          text: root.canThenHibernate ? root.hibernateDelayText : "Unavailable; suspends instead"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -301,7 +303,7 @@ Panel {
 
         PanelToolTip {
           visible: thenSwitch.containsMouse
-          text: "Suspend, then hibernate when systemd decides: HibernateDelaySec= in sleep.conf, by default 2 h without a battery and on low battery with one"
+          text: root.hibernateDelayHint
           fontFamily: root.fontFamily
         }
       }

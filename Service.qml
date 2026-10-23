@@ -104,6 +104,14 @@ Item {
   // up (swap, resume=) and allowed.
   property bool canHibernate: false
   property bool canSuspendThenHibernate: false
+  // systemd's sleep settings, read with the probe: HibernateDelaySec= (""
+  // when unset), HibernateOnACPower=, and whether there is a battery.
+  // hibernateDelayText says when suspend-then-hibernate hibernates.
+  property string hibernateDelay: ""
+  property bool hibernateOnAC: true
+  property bool hasBattery: false
+  readonly property string hibernateDelayText: IdleModel.hibernateDelayText(hibernateDelay, hasBattery)
+  readonly property string hibernateDelayHint: IdleModel.hibernateDelayHint(hibernateDelay, hasBattery, hibernateOnAC)
   // Suspend and hibernate are exclusive (IdleModel.EXCLUSIVE). Both on in
   // shell.json by hand: hibernate wins and suspend counts as off.
   readonly property bool suspendOverridden: suspendEnabled && hibernateEnabled && canHibernate
@@ -659,6 +667,20 @@ Item {
     if (!hibernateProbe.running) hibernateProbe.running = true
   }
 
+  function applyHibernateProbe(text) {
+    var values = {}
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var at = lines[i].indexOf("=")
+      if (at > 0) values[lines[i].slice(0, at)] = lines[i].slice(at + 1).trim()
+    }
+    root.canHibernate = values.hibernate === "s \"yes\""
+    root.canSuspendThenHibernate = values.then === "s \"yes\""
+    root.hibernateDelay = values.delay || ""
+    root.hibernateOnAC = IdleModel.systemdBool(values.onac, true)
+    root.hasBattery = values.battery === "yes"
+  }
+
   function handleHibernateIdleChanged() {
     logEvent("hibernate-monitor", root.hibernateIdle ? "idle" : "active")
     if (!root.hibernateIdle) {
@@ -716,7 +738,14 @@ Item {
         hibernate: stageJson("hibernate")
       },
       canHibernate: root.canHibernate,
-      suspendThenHibernate: { enabled: root.suspendThenHibernate, available: root.canSuspendThenHibernate },
+      suspendThenHibernate: {
+        enabled: root.suspendThenHibernate,
+        available: root.canSuspendThenHibernate,
+        hibernateDelay: root.hibernateDelay,
+        hibernateOnAC: root.hibernateOnAC,
+        battery: root.hasBattery,
+        when: root.hibernateDelayText
+      },
       idle: root.cycleIdle,
       standbyIdle: root.standbyIdle,
       standbyActive: root.standbyActive,
@@ -1189,14 +1218,16 @@ Item {
   }
   Process {
     id: hibernateProbe
+    // One key=value per line. cat-config prints sleep.conf and its drop-ins
+    // in order, so the last assignment wins, as in systemd.
     command: ["bash", "-c", "echo \"hibernate=$(" + root.logindCall + " CanHibernate 2>/dev/null)\"; "
-      + "echo \"then=$(" + root.logindCall + " CanSuspendThenHibernate 2>/dev/null)\""]
+      + "echo \"then=$(" + root.logindCall + " CanSuspendThenHibernate 2>/dev/null)\"; "
+      + "conf=$(systemd-analyze cat-config systemd/sleep.conf 2>/dev/null); "
+      + "echo \"delay=$(sed -n 's/^[[:space:]]*HibernateDelaySec=[[:space:]]*//p' <<< \"$conf\" | tail -n 1)\"; "
+      + "echo \"onac=$(sed -n 's/^[[:space:]]*HibernateOnACPower=[[:space:]]*//p' <<< \"$conf\" | tail -n 1)\"; "
+      + "for t in /sys/class/power_supply/*/type; do [ \"$(cat \"$t\" 2>/dev/null)\" = Battery ] && { echo battery=yes; break; }; done; true"]
     stdout: StdioCollector {
-      onStreamFinished: {
-        var text = String(this.text)
-        root.canHibernate = text.indexOf("hibernate=s \"yes\"") !== -1
-        root.canSuspendThenHibernate = text.indexOf("then=s \"yes\"") !== -1
-      }
+      onStreamFinished: root.applyHibernateProbe(this.text)
     }
   }
 

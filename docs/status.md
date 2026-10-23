@@ -28,7 +28,8 @@ Budget 15 KB.
    apply each mutation onto it until the reload matches. Found by the Fable review, 2026-10-22.
 
 5. Branch `suspend-then-hibernate` (not pushed): the lock fix, a Hibernate stage exclusive with suspend,
-   and a "Then hibernate" switch. IPC checked live; the panel with the switch not yet seen. No real hibernate tested yet: it writes RAM to
+   a "Then hibernate" switch with systemd's delay shown read-only. IPC checked live before the delay
+   line; the panel with the switch not yet seen. Astra's information review (2026-10-23) given to Kike. No real hibernate tested yet: it writes RAM to
    the swapfile on the NVMe, only with Kike's go-ahead after closing what is open. Releases as 1.6.0
    after #12622 is approved.
 
