@@ -294,16 +294,44 @@ Panel {
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
 
-      // Same text shape as a stage name ("4  Suspend"), so it lines up under it.
-      Text {
-        text: "↳  Hibernate after"
-        color: thenRow.isOn ? root.foreground : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
+      // The arrow, icon-sized, in a slot as wide as the "4  " of the row
+      // above, so the name lines up under "Suspend".
+      Row {
+        spacing: 0
         Layout.fillWidth: true
         Layout.maximumWidth: implicitWidth
         Layout.minimumWidth: implicitWidth
+
+        Item {
+          width: numberProbe.implicitWidth
+          height: thenName.implicitHeight
+
+          Text {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "↳"
+            color: thenRow.isOn ? root.foreground : root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.icon
+          }
+        }
+
+        Text {
+          id: thenName
+          text: "Hibernate after"
+          color: thenRow.isOn ? root.foreground : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          elide: Text.ElideRight
+        }
+
+        Text {
+          id: numberProbe
+          visible: false
+          text: "4  "
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
       }
 
       Item { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.horizontalStretchFactor: 0 }
