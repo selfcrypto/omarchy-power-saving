@@ -278,7 +278,7 @@ Panel {
     }
   }
 
-  // Under the suspend row, as its 4→5: suspend through logind's
+  // Under the suspend row, marked ↳ as what follows it: suspend through logind's
   // SuspendThenHibernate. The box holds the delay systemd will use; it is
   // read-only, since the plugin cannot set it, and says how to on hover.
   component ThenHibernateRow: Item {
@@ -294,15 +294,9 @@ Panel {
       anchors.rightMargin: Style.space(10)
       spacing: Style.space(8)
 
+      // Same text shape as a stage name ("4  Suspend"), so it lines up under it.
       Text {
-        text: "4→5"
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-
-      Text {
-        text: "Hibernate after"
+        text: "↳  Hibernate after"
         color: thenRow.isOn ? root.foreground : root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.body
