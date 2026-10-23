@@ -633,9 +633,12 @@ Item {
     sleepSystem("hibernate", root.logindCall + " Hibernate b true", hibernateProcess, reason)
   }
 
+  // It modifies suspend, so it is only switched on while suspend is on;
+  // switching it off always works.
   function setSuspendThenHibernate(value) {
     var enabled = !!value
     if (root.suspendThenHibernate === enabled) return true
+    if (enabled && !stageEnabled("suspend")) return false
     return mutateIdleConfig("suspendThenHibernate " + (enabled ? "on" : "off"), function(idle) {
       idle.suspendThenHibernate = enabled
     })
