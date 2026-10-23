@@ -213,24 +213,21 @@ function systemdBool(value, fallback) {
 // Without a battery: after the delay, 2 h when unset. With one: at low
 // battery, or after the delay if that comes first; with HibernateOnACPower=no
 // the delay only runs on battery (said in the hint).
-// As the end of "Then hibernate ...": "after 2 h", "after 45 min or at low
-// battery", "at low battery".
+// Under "Then hibernate after": "2 h (System default)", "45 min (System
+// setting)", "45 min or at low battery (System setting)", "Low battery
+// (System default)".
 function hibernateDelayText(delay, hasBattery) {
   var seconds = timespanSeconds(delay)
   var after = seconds > 0 ? durationText(seconds) : ""
-  if (!hasBattery) return "after " + (after || "2 h")
-  return after ? "after " + after + " or at low battery" : "at low battery"
+  var source = after ? " (System setting)" : " (System default)"
+  if (!hasBattery) return (after || "2 h") + source
+  return (after ? after + " or at low battery" : "Low battery") + source
 }
 
-// Where that comes from, for the line under it.
-function hibernateDelaySource(delay) {
-  return timespanSeconds(delay) > 0 ? "System setting" : "System default"
-}
-
-// The tooltip under it: what the line is, and where the delay is set.
+// The tooltip: how to change it.
 function hibernateDelayHint(delay, hasBattery, onAC) {
-  var text = "System-managed timing after suspend; not a guaranteed deadline. Set by HibernateDelaySec= in /etc/systemd/sleep.conf.d/ (root)."
-  if (hasBattery && onAC === false && timespanSeconds(delay) > 0) text += " Delay starts after unplugging."
+  var text = "Set by systemd, not the plugin. To change it, as root: HibernateDelaySec= in /etc/systemd/sleep.conf.d/. Applies from the next suspend."
+  if (hasBattery && onAC === false && timespanSeconds(delay) > 0) text += " The delay starts after unplugging."
   return text
 }
 
@@ -308,7 +305,6 @@ if (typeof module !== "undefined") {
     timespanSeconds: timespanSeconds,
     hibernateDelayText: hibernateDelayText,
     hibernateDelayHint: hibernateDelayHint,
-    hibernateDelaySource: hibernateDelaySource,
     systemdBool: systemdBool,
     isObject: isObject,
     STAGE_KEYS: STAGE_KEYS,

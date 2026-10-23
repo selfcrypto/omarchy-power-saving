@@ -36,10 +36,10 @@ Panel {
   ]
   readonly property var systemStages: [
     { key: "lock", glyph: "󰌾", number: 3, nowKey: "k", hint: "Locks the session" },
-    { key: "suspend", glyph: "󰒲", number: 4, nowKey: "s", hint: "Suspend through logind; the session locks first", caption: "Locks, then suspends" }
+    { key: "suspend", glyph: "󰒲", number: 4, nowKey: "s", hint: "Suspend through logind; the session locks first" }
   ]
   readonly property var hibernationStages: [
-    { key: "hibernate", glyph: "󰜗", number: 5, nowKey: "h", hint: "Hibernate through logind; the session locks first", caption: "Locks, then saves the session to disk" }
+    { key: "hibernate", glyph: "󰜗", number: 5, nowKey: "h", hint: "Hibernate through logind; the session locks first" }
   ]
   // Hibernation is listed only where logind says it can hibernate.
   readonly property bool canHibernate: ready && svc.canHibernate
@@ -62,7 +62,6 @@ Panel {
   readonly property bool canThenHibernate: ready && svc.canSuspendThenHibernate
   readonly property string hibernateDelayText: ready ? svc.hibernateDelayText : ""
   readonly property string hibernateDelayHint: ready ? svc.hibernateDelayHint : ""
-  readonly property string hibernateDelaySource: ready ? svc.hibernateDelaySource : ""
   readonly property bool showThenHibernate: thenHibernate || canThenHibernate
   function toggleThenHibernate() { if (ready) svc.setSuspendThenHibernate(!thenHibernate) }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
@@ -226,29 +225,16 @@ Panel {
         }
       }
 
-      Column {
+      Text {
+        text: row.modelData.number + "  " + IdleModel.stageLabel(row.key)
+        color: row.isOn ? root.foreground : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        font.bold: row.isOn
+        elide: Text.ElideRight
         Layout.fillWidth: true
         Layout.maximumWidth: implicitWidth
         Layout.minimumWidth: implicitWidth
-        spacing: Style.space(1)
-
-        Text {
-          text: row.modelData.number + "  " + IdleModel.stageLabel(row.key)
-          color: row.isOn ? root.foreground : root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          font.bold: row.isOn
-        }
-
-        // What the stage does, for the two that put the machine to sleep.
-        Text {
-          visible: row.isOn && !!row.modelData.caption
-          textFormat: Text.PlainText
-          text: row.modelData.caption || ""
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-        }
       }
 
       KeyCap { label: row.modelData.nowKey }
@@ -299,6 +285,13 @@ Panel {
     width: parent ? parent.width : 0
     height: thenLayout.implicitHeight + Style.space(10)
 
+    HoverHandler { id: thenHover }
+
+    PanelToolTip {
+      visible: thenHover.hovered
+      text: root.hibernateDelayHint
+      fontFamily: root.fontFamily
+    }
 
     RowLayout {
       id: thenLayout
@@ -316,7 +309,7 @@ Panel {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: "Then hibernate" + (root.canThenHibernate ? " " + root.hibernateDelayText : "")
+          text: "Then hibernate after"
           color: root.thenHibernate && root.stageEnabled("suspend") ? root.foreground : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -326,7 +319,7 @@ Panel {
         Text {
           width: parent.width
           textFormat: Text.PlainText
-          text: root.canThenHibernate ? root.hibernateDelaySource : "Unavailable; suspends instead"
+          text: root.canThenHibernate ? root.hibernateDelayText : "Unavailable; suspends instead"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -340,12 +333,6 @@ Panel {
         interactive: root.ready
         foreground: root.foreground
         onToggled: root.toggleThenHibernate()
-
-        PanelToolTip {
-          visible: thenSwitch.containsMouse
-          text: root.hibernateDelayHint
-          fontFamily: root.fontFamily
-        }
       }
     }
   }

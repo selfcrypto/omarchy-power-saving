@@ -41,8 +41,9 @@ Budget 15 KB.
 
 ## Done
 
-- **2026-10-23.** "Then hibernate" could be switched on with suspend off (found by Kike). Switching it
-  on now switches suspend on too (and so hibernate off), in one write.
+- **2026-10-23.** "Then hibernate" and suspend move together (found by Kike twice): switching it on
+  switches suspend on; switching suspend off, by its switch or by hibernate going on, switches it off.
+  One config write each way.
 
 - **2026-10-23.** A screensaver open when the service starts is adopted, so input closes it.
 
