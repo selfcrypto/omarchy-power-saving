@@ -73,7 +73,7 @@ Minutes spin box for the stage rows: Omarchy's NumberField look, without
 - function keypadDigit L86: KP_Insert … KP_PageUp, as they arrive without NumLock, in keypad order 0–9.
 - function digitOf L103: The digit a key press types, "" for any other key.
 
-## Panel.qml (647 lines)
+## Panel.qml (626 lines)
 Power saving: a bar icon (highlighted while "stay awake" is on) with a panel
 - property svc L26
 - property ready L27

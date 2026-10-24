@@ -523,17 +523,40 @@ Panel {
               }
             }
             trailingControl: Component {
-              ToggleSwitch {
-                id: powerSwitch
-                checked: root.powerSaving
-                interactive: root.ready
-                foreground: root.foreground
-                onToggled: root.togglePowerSaving()
+              Row {
+                spacing: Style.space(10)
 
-                PanelToolTip {
-                  visible: powerSwitch.containsMouse
-                  text: root.powerSaving ? "Stay awake (pause all stages)" : "Resume power saving"
-                  fontFamily: root.fontFamily
+                // Things the panel cannot show as a state.
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "󰋽"
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.icon
+
+                  HoverHandler { id: infoHover }
+
+                  PanelToolTip {
+                    visible: infoHover.hovered
+                    text: "Apps that request idle inhibition, such as video players, can delay idle actions."
+                      + (root.ready && !root.canHibernate ? " Hibernation is unavailable on this system; setup: omarchy-hibernation-setup." : "")
+                    fontFamily: root.fontFamily
+                  }
+                }
+
+                ToggleSwitch {
+                  id: powerSwitch
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: root.powerSaving
+                  interactive: root.ready
+                  foreground: root.foreground
+                  onToggled: root.togglePowerSaving()
+
+                  PanelToolTip {
+                    visible: powerSwitch.containsMouse
+                    text: root.powerSaving ? "Stay awake (pause all stages)" : "Resume power saving"
+                    fontFamily: root.fontFamily
+                  }
                 }
               }
             }
@@ -571,71 +594,27 @@ Panel {
           PanelSeparator { width: parent.width; foreground: root.foreground }
 
           // Run keys live beside their stage; global keys stay in the footer.
-          Column {
+          Flow {
             width: parent.width
-            spacing: Style.space(2)
+            spacing: Style.space(6)
 
-            Flow {
-              width: parent.width
-              spacing: Style.space(6)
+            Repeater {
+              model: [{ key: "t", text: "stay awake" }, { key: "1–" + root.stages.length, text: "stage on/off" }, { key: "click", text: "a name runs it" }]
+              delegate: Row {
+                id: hint
+                required property var modelData
+                spacing: Style.space(5)
+                rightPadding: Style.space(8)
 
-              Repeater {
-                model: [{ key: "t", text: "stay awake" }, { key: "1–" + root.stages.length, text: "stage on/off" }, { key: "click", text: "a name runs it" }]
-                delegate: Row {
-                  id: hint
-                  required property var modelData
-                  spacing: Style.space(5)
-                  rightPadding: Style.space(8)
+                KeyCap { label: hint.modelData.key }
 
-                  KeyCap { label: hint.modelData.key }
-
-                  Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    textFormat: Text.PlainText
-                    text: hint.modelData.text
-                    color: root.dim
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-                }
-              }
-            }
-
-            // Things the panel cannot show as a state, with the detail on hover.
-            Flow {
-              width: parent.width
-              spacing: Style.space(6)
-              topPadding: Style.space(4)
-
-              Repeater {
-                model: [
-                  { show: true, text: "Apps can delay idle actions",
-                    hint: "Apps that request idle inhibition, such as video players, can keep the screen on." },
-                  { show: root.ready && !root.canHibernate, text: "Hibernation unavailable",
-                    hint: "The system does not currently offer hibernation. Setup: omarchy-hibernation-setup" }
-                ].filter(function(note) { return note.show })
-                delegate: Text {
-                  id: footerNote
-                  required property var modelData
-                  rightPadding: Style.space(8)
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
                   textFormat: Text.PlainText
-                  text: "󰋽 " + footerNote.modelData.text
+                  text: hint.modelData.text
                   color: root.dim
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
-
-                  MouseArea {
-                    id: noteMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.NoButton
-                  }
-
-                  PanelToolTip {
-                    visible: noteMouse.containsMouse
-                    text: footerNote.modelData.hint
-                    fontFamily: root.fontFamily
-                  }
                 }
               }
             }

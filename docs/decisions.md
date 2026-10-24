@@ -112,3 +112,7 @@ Titles are never changed once cited from another file.
 ## 2026-10-24 · No sudo in the README
 **Decision.** The README gives the hibernate delay drop-in as a file path and its content, not as `sudo` commands.
 **Why.** The marketplace security baseline flags any `sudo` or `pkexec` line, README included, and asks for a manual review. Seen on #12622 for 1.6.0.
+
+## 2026-10-24 · Panel notes behind an ⓘ in the hero
+**Decision.** "Apps can delay idle actions" and "Hibernation unavailable" are the tooltip of an ⓘ left of the main switch, not a footer line.
+**Why.** Kike: the footer note was misaligned and took a whole line.
