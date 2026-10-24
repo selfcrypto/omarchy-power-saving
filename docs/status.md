@@ -9,7 +9,7 @@ Budget 15 KB.
 |---|---|
 | Released | 1.4.5 (`be25c0f`), verified on the marketplace (#11121) |
 | `main` on GitHub | 1.6.0, the commit named in issue #12622 |
-| Tags | `v1.6.0` on that commit (moved after the README sudo fix); `v1.5.0` stays on `ec9acf8`, never published |
+| Tags | `v1.6.0` on that commit (moved to the last 1.6.0 commit); `v1.5.0` stays on `ec9acf8`, never published |
 | Marketplace | #12622 `[Verify]`, retitled from 1.5.0 to 1.6.0, waiting for the bot and a maintainer |
 | Installed copy | Runs the 1.6.0 files, copied in for the live check |
 
