@@ -3,33 +3,29 @@
 Current state only. The next session starts here. History: `docs/history/status-journal.md`.
 Budget 15 KB.
 
-## Where things stand, 2026-10-24
+## Where things stand, 2026-10-27
 
 | Thing | State |
 |---|---|
-| Released | 1.4.5 (`be25c0f`), verified on the marketplace (#11121) |
-| `main` on GitHub | 1.6.0, the commit named in issue #12622 |
-| Tags | `v1.6.0` on that commit (moved to the last 1.6.0 commit); `v1.5.0` stays on `ec9acf8`, never published |
-| Marketplace | #12622 `[Verify]`, retitled from 1.5.0 to 1.6.0, waiting for the bot and a maintainer |
-| Installed copy | Runs the 1.6.0 files, copied in for the live check |
+| Released | 1.6.0 (`8be2ffe`), verified on the marketplace (#12622, approved 2026-10-26) |
+| `main` on GitHub | 1.6.0, tag `v1.6.0`; `v1.5.0` on `ec9acf8` was never published |
+| Installed copy | Clean clone at 1.6.0 (`omarchy plugin update`, 2026-10-27) |
 
 ## Pending
 
-1. #12622 approved. While it is open, a push makes it stale: edit its body to the new HEAD SHA and watch the bot.
-2. After approval, `omarchy plugin update io.github.selfcrypto.power-saving` so the installed copy is clean again.
-3. No real hibernate or suspend-then-hibernate tested yet: it writes RAM to the swapfile on the NVMe,
+1. No real hibernate or suspend-then-hibernate tested yet: it writes RAM to the swapfile on the NVMe,
    only with Kike's go-ahead after closing what is open. A short delay needs a root drop-in
    (`HibernateDelaySec=`). The logind command branch was checked dry.
-4. Check what logind does when another program holds a sleep lock: the suspend call is
+2. Check what logind does when another program holds a sleep lock: the suspend call is
    interactive and polkit allows ignoring a lock with an admin password, so it may prompt
    instead of being refused. The README claim was removed until this is tested (needs a real
    suspend; mind the short-suspend NVMe issue).
-5. Config writes close together can lose the first: `mutateIdleConfig` rebuilds the entry from the
+3. Config writes close together can lose the first: `mutateIdleConfig` rebuilds the entry from the
    last file reload, so a second write before the reload (stepper commit, then a switch click on
    another stage within a fraction of a second) overwrites the first. `setGatedStage` already
    writes switch and timeout of one stage together. Fix: keep a pending entry in the service and
    apply each mutation onto it until the reload matches. Found by the Fable review, 2026-10-22.
-6. `IdleModel.timespanSeconds` does not know `month`, `y` or `infinity`; such a `HibernateDelaySec`
+4. `IdleModel.timespanSeconds` does not know `month`, `y` or `infinity`; such a `HibernateDelaySec`
    shows as the 2 h default.
 
 ## Standing facts
