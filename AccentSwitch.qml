@@ -11,6 +11,8 @@ Item {
   id: root
 
   property bool checked: false
+  // An operation in flight: clicks are swallowed, hover and tooltips stay.
+  property bool busy: false
   property bool interactive: true
   property color foreground: Commons.Color.popups.text
   property color accent: Commons.Color.accent
@@ -70,6 +72,6 @@ Item {
     enabled: root.interactive
     hoverEnabled: true
     cursorShape: Qt.PointingHandCursor
-    onClicked: root.toggled()
+    onClicked: if (!root.busy) root.toggled()
   }
 }

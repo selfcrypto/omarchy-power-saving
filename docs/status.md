@@ -36,9 +36,9 @@ Budget 15 KB.
 
 ## Done
 
-- **2026-11-22.** Switches have an accent track when on: own component `AccentSwitch.qml` in place of the
-  shell's `ToggleSwitch` (branch `switch-accent`). Lint and node tests pass, loaded in the shell without
-  errors. Not merged, not released.
+- **2026-11-22.** 1.6.1: switches have an accent track when on, own component `AccentSwitch.qml` in place of
+  the shell's `ToggleSwitch`; `preview.png` shows it (switches redrawn in place). Lint and node tests
+  pass, loaded in the shell without errors.
 
 - **2026-10-24.** 1.6.0: Hibernate stage, suspend and hibernate exclusive, "Hibernate after" with
   systemd's delay, information in the panel, new preview. Tested live through IPC (every switch

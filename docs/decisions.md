@@ -121,3 +121,8 @@ Titles are never changed once cited from another file.
 **Decision.** The panel draws its own switch, `AccentSwitch.qml`: size and off look of the shell's `ToggleSwitch`, solid accent track and a knob in the popup background color when on.
 **Why.** Kike: the switches showed only a grey fill when enabled and he wants that fill in the theme accent. The stock switch takes its on color from the theme's `selected-color`, and the generated `shell.toml` of every theme writes it as the foreground hex at 0.18 alpha, so no property passed from outside changes it.
 **Alternative rejected.** Passing the accent as `foreground` to the stock switch while checked: tried first, no effect, the hex in `shell.toml` wins. Setting `selected-color` in the user's `shell.toml`: changes every control of the shell and only on that machine.
+
+## 2026-11-22 · Preview switches redrawn, not recaptured
+**Decision.** For the accent switch, `preview.png` keeps the earlier capture and only its on switches were redrawn in place (accent `#7aa2f7` track, `#1a1b26` knob, the capture's Tokyo Night colors, same size and position).
+**Why.** Nothing else in the panel changed, and a new capture needs the old theme and the demo state again.
+**Alternative rejected.** A full recapture: same picture, at the cost of a theme switch and demo setup on Kike's desktop.

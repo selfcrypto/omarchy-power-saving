@@ -5,22 +5,23 @@ One section per file: its first doc line, then each top-level symbol with its li
 
 <!-- repo-docs v3 roots=. 2026-11-22 -->
 
-## AccentSwitch.qml (75 lines)
+## AccentSwitch.qml (77 lines)
 On/off switch with the size and off look of the shell's ToggleSwitch and an
 - property checked L13
-- property interactive L14
-- property foreground L15
-- property accent L16
-- property surface L18: Knob color when on: the surface behind the switch, so it reads on the accent.
-- property rounded L19
-- signal toggled L21
-- property containsMouse L23
-- property mirrored L24
-- property trackHeight L26
-- property trackWidth L27
-- property knobSize L28
-- property knobInset L29
-- property pad L30
+- property busy L15: An operation in flight: clicks are swallowed, hover and tooltips stay.
+- property interactive L16
+- property foreground L17
+- property accent L18
+- property surface L20: Knob color when on: the surface behind the switch, so it reads on the accent.
+- property rounded L21
+- signal toggled L23
+- property containsMouse L25
+- property mirrored L26
+- property trackHeight L28
+- property trackWidth L29
+- property knobSize L30
+- property knobInset L31
+- property pad L32
 
 ## IdleModel.js (331 lines)
 Pure helpers shared by Service.qml and Panel.qml. Cloned from
