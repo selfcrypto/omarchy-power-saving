@@ -116,3 +116,8 @@ Titles are never changed once cited from another file.
 ## 2026-10-24 · Panel notes behind an ⓘ in the hero
 **Decision.** "Apps can delay idle actions" and "Hibernation unavailable" are the tooltip of an ⓘ left of the main switch, not a footer line.
 **Why.** Kike: the footer note was misaligned and took a whole line.
+
+## 2026-11-22 · Switches use the accent when on
+**Decision.** The panel draws its own switch, `AccentSwitch.qml`: size and off look of the shell's `ToggleSwitch`, solid accent track and a knob in the popup background color when on.
+**Why.** Kike: the switches showed only a grey fill when enabled and he wants that fill in the theme accent. The stock switch takes its on color from the theme's `selected-color`, and the generated `shell.toml` of every theme writes it as the foreground hex at 0.18 alpha, so no property passed from outside changes it.
+**Alternative rejected.** Passing the accent as `foreground` to the stock switch while checked: tried first, no effect, the hex in `shell.toml` wins. Setting `selected-color` in the user's `shell.toml`: changes every control of the shell and only on that machine.

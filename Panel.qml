@@ -262,7 +262,7 @@ Panel {
         }
       }
 
-      ToggleSwitch {
+      AccentSwitch {
         id: stageSwitch
         checked: row.isOn
         interactive: root.ready
@@ -368,7 +368,7 @@ Panel {
         }
       }
 
-      ToggleSwitch {
+      AccentSwitch {
         id: thenSwitch
         checked: root.thenHibernate
         interactive: root.ready
@@ -544,7 +544,7 @@ Panel {
                   }
                 }
 
-                ToggleSwitch {
+                AccentSwitch {
                   id: powerSwitch
                   anchors.verticalCenter: parent.verticalCenter
                   checked: root.powerSaving

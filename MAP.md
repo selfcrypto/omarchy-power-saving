@@ -17,6 +17,7 @@ grep it). This file says what each file is for and where to go for a kind of cha
 | A stage row, the hero, the footer | `Panel.qml` (`StageRow`, `KeyCap`, `PanelHero`) | `preview.png` |
 | A panel key | `Panel.qml` (`keyCatcher`) | README "Keys in the panel", footer in `Panel.qml` |
 | The minutes stepper | `MinutesField.qml` | |
+| A switch and its colors | `AccentSwitch.qml` | |
 | The bar icon and its tooltip | `Panel.qml` (`BarIconButton`) | |
 | Marketplace text or version | `manifest.json` | `docs/runbooks/release.md` |
 
@@ -28,6 +29,7 @@ grep it). This file says what each file is for and where to go for a kind of cha
 | `Panel.qml` | Bar icon and panel, one per monitor; reads and calls the service only |
 | `IdleSchedule.qml` | The stages as dots in firing order; a click switches a stage |
 | `MinutesField.qml` | Minutes spin box with −/+ buttons and key-by-key digit entry |
+| `AccentSwitch.qml` | On/off switch of the panel: stock size, accent track when on |
 | `IdleModel.js` | Pure helpers: config parsing, stage order and bounds, summaries |
 | `tests/idle-model.test.js` | Stage bounds, clamping, summary order |
 | `manifest.json` | Plugin id, version, marketplace descriptions, entry points |
