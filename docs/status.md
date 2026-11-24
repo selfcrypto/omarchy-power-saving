@@ -27,6 +27,10 @@ Budget 15 KB.
    apply each mutation onto it until the reload matches. Found by the Fable review, 2026-10-22.
 4. `IdleModel.timespanSeconds` does not know `month`, `y` or `infinity`; such a `HibernateDelaySec`
    shows as the 2 h default.
+5. Lid-close standby (`lid-standby` branch): enable/disable verified live (drop-in write and
+   remove, watcher start/stop, `sudo -n` silent path while passwordless sudo is active). Still
+   needs a real lid close — `standbyDisplays` on close, `wakeDisplays` on open — and a declined
+   prompt leaving logind suspending without re-asking.
 
 ## Standing facts
 
@@ -35,6 +39,13 @@ Budget 15 KB.
 - Only the keyboard wakes the PC from suspend (kernel USB wakeup, udev rule), not the plugin.
 
 ## Done
+
+- **2026-11-23.** Lid-close standby (branch `lid-standby`, not released): ↳ "On lid close" row under
+  Standby in the Display group, laptops only (lid switch probe). `lidStandby` config key, IPC
+  `idle lidStandby`, `lid` object in `idle status`. Takes over the lid switch through a logind
+  drop-in (`HandleLidSwitch*=ignore`, `sudo -n` with pkexec fallback + `busctl ReloadUnit`, no
+  `systemctl`) and a `/proc/acpi/button/lid` watcher that runs the standby DPMS path on close.
+  Node tests and qmllint pass; enable/disable verified live. Not yet verified: a real lid close.
 
 - **2026-11-22.** 1.6.1: switches have an accent track when on, own component `AccentSwitch.qml` in place of
   the shell's `ToggleSwitch`; `preview.png` shows it (switches redrawn in place). Lint and node tests

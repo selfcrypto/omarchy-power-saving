@@ -135,3 +135,19 @@ test("then hibernate goes off with suspend, string values included", () => {
     { suspendEnabled: true, suspendThenHibernate: true })
   assert.deepStrictEqual(M.exclusiveSettings({ hibernateEnabled: true }, true), { hibernateEnabled: true })
 })
+
+test("lidStandby round-trips through the bar entry settings", () => {
+  const bar = { layout: { right: [{ id: "io.github.selfcrypto.power-saving", lidStandby: true, suspend: 600 }] } }
+  const entry = M.barEntrySettings(bar, "io.github.selfcrypto.power-saving")
+  const merged = M.mergedStageConfig(entry, {})
+  assert.strictEqual(merged.lidStandby, true)
+  const written = M.stageSettingsFor(entry, merged)
+  assert.strictEqual(written.lidStandby, true)
+})
+
+test("lidStandby falls back to off and survives a write that does not set it", () => {
+  const merged = M.mergedStageConfig({ suspend: 600 }, { suspend: 900 })
+  assert.strictEqual(merged.lidStandby, undefined)
+  const written = M.stageSettingsFor({ suspend: 600 }, merged)
+  assert.strictEqual(written.lidStandby, undefined)
+})

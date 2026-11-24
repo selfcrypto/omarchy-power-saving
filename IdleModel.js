@@ -239,7 +239,7 @@ function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "hibernate", "hibernateEnabled", "suspendThenHibernate"]
+var STAGE_KEYS = ["screensaver", "standby", "lock", "suspend", "lockEnabled", "standbyEnabled", "suspendEnabled", "hibernate", "hibernateEnabled", "suspendThenHibernate", "lidStandby"]
 
 // Inline settings of one bar entry (`{ id, ...settings }` in bar.layout.*),
 // without the id; {} when the entry is absent, so reads fall back.

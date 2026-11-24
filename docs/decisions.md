@@ -126,3 +126,12 @@ Titles are never changed once cited from another file.
 **Decision.** For the accent switch, `preview.png` keeps the earlier capture and only its on switches were redrawn in place (accent `#7aa2f7` track, `#1a1b26` knob, the capture's Tokyo Night colors, same size and position).
 **Why.** Nothing else in the panel changed, and a new capture needs the old theme and the demo state again.
 **Alternative rejected.** A full recapture: same picture, at the cost of a theme switch and demo setup on Kike's desktop.
+
+## 2026-11-23 · Lid-close standby is userspace, gated on a lid probe
+**Decision.** "On lid close" (laptops only) takes the lid switch over: a logind drop-in sets `HandleLidSwitch*=ignore` for all three variants and the service watches `/proc/acpi/button/lid/*/state` itself, running `standbyDisplays` on close. The drop-in is written and removed through `sudo -n` when passwordless sudo is available, `pkexec` (polkit prompt) otherwise, and logind is reloaded with `busctl … ReloadUnit` (never `systemctl`, the scanner rule). Lid presence is probed from the ACPI button device, not DMI chassis type.
+**Why.** logind's `HandleLidSwitch` knows suspend, hibernate, lock and ignore, but not DPMS; only Hyprland can switch the monitors off. Kike asked for a lid-close standby toggle and that it show only on laptops.
+**Alternative rejected.** `HandleLidSwitch=ignore` once and the plugin choosing the action (standby or its own suspend): fewer prompts, but a dead shell then leaves the lid doing nothing at all, and "off" stops being logind's own suspend. Per-change drop-in keeps logind authoritative whenever the switch is off.
+
+## 2026-11-23 · syncLid reads plain properties, never bound ones
+**Decision.** `syncLid` and `syncLidWatcher` compute readiness (`hasLidKnown && lidDropInKnown`) and wanted-ness (`lidStandby && hasLid`) from the plain properties inline; the `lidReady`/`lidWanted` bound properties were removed.
+**Why.** Inside a `onXChanged` handler a bound property can still return its previous value: the enable once logged `wanted=false` with the switch already on and silently did nothing until an unrelated probe re-ran the sync. Plain properties are assigned before their change signal fires, so they are always current in the handler.
