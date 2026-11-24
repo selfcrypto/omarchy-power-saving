@@ -39,6 +39,9 @@ import "IdleModel.js" as IdleModel
 //   hibernate                      seconds since idle began (ours)
 //   lockEnabled / suspendEnabled / standbyEnabled / hibernateEnabled
 //                                  booleans (defaults: true / false / false / false)
+//   lidStandby                     boolean (default false): laptops only, closing
+//                                  the lid switches the monitors off instead of
+//                                  letting logind suspend (see the lid section)
 // The screensaver switch is Omarchy's own `screensaver-off` toggle
 // (`omarchy toggle screensaver`), so the menu and the panel agree. "Stay
 // awake" (`omarchy toggle idle`) pauses all the stages.
@@ -703,6 +706,124 @@ Item {
     if (root.suspendArmed) noteIdle(root.suspendTimeoutSeconds)
   }
 
+  // -------------------------------------------------------------------- lid
+
+  // Closing the lid is logind's job by default (HandleLidSwitch=suspend), and
+  // logind cannot switch monitors off: standby is DPMS, which only Hyprland
+  // does. So on laptops the panel's "On lid close" switch lets this service
+  // take the lid switch over. While it is on, a drop-in in
+  // /etc/systemd/logind.conf.d sets every HandleLidSwitch* to ignore (written
+  // and removed through passwordless sudo when available, else pkexec's
+  // polkit prompt, and logind reloaded over D-Bus — `systemctl` is off limits
+  // here, the marketplace scanner reads it as service management) and a
+  // watcher on /proc/acpi/button/lid fires the
+  // same standbyDisplays the standby stage uses on close and wakeDisplays on
+  // open. With the switch off the file is removed and logind's own
+  // suspend-on-close is back. The watcher only runs while the drop-in is in
+  // place, so a declined prompt leaves logind in charge.
+  //
+  // Laptops are detected by the lid switch itself (/proc/acpi/button/lid/*/
+  // state), not by chassis type: the panel row and every effect are hidden
+  // or off where no lid exists.
+  readonly property bool lidStandby: IdleModel.boolFromConfig(stageConfig.lidStandby, false)
+  property bool hasLid: false
+  property bool hasLidKnown: false
+  property bool lidDropIn: false
+  property bool lidDropInKnown: false
+  property string lidState: ""
+  // The wanted value an apply was last launched for; keeps a declined
+  // privilege prompt from being asked again on every sync. Cleared once
+  // converged.
+  property string lidApplyTried: ""
+
+  readonly property string lidDropInPath: "/etc/systemd/logind.conf.d/60-omarchy-power-saving-lid.conf"
+  readonly property string lidLogindReload: "busctl call org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager ReloadUnit ss systemd-logind.service fail"
+  // Passwordless sudo when it is available (omarchy-sudo-passwordless,
+  // passwordless sudoers entries, CI), a polkit prompt through pkexec
+  // otherwise. $E word-splits into the chosen escalator plus its flags.
+  readonly property string lidEscalate: "E=\"sudo -n\"; sudo -n true 2>/dev/null || E=pkexec; $E "
+  readonly property string lidEnableCommand: root.lidEscalate + "bash -c 'printf \"%s\\n\" \"# Managed by io.github.selfcrypto.power-saving (Omarchy Power Saving).\" \"# Closing the lid switches the monitors off instead of suspending.\" \"# Remove this file or turn the panel switch off to restore suspend on close.\" \"[Login]\" \"HandleLidSwitch=ignore\" \"HandleLidSwitchExternalPower=ignore\" \"HandleLidSwitchDocked=ignore\" > " + root.lidDropInPath + " && " + root.lidLogindReload + "'"
+  readonly property string lidDisableCommand: root.lidEscalate + "bash -c 'rm -f " + root.lidDropInPath + " && " + root.lidLogindReload + "'"
+  readonly property string lidProbeCommand: "lid=no; for f in /proc/acpi/button/lid/*/state; do [ -r \"$f\" ] && { lid=yes; break; }; done; echo \"lid=$lid\"; echo \"dropin=$([ -f " + root.lidDropInPath + " ] && echo yes || echo no)\""
+  // Prints the lid state on every change, first read included: enabling the
+  // switch with the lid already closed should still switch the monitors off.
+  readonly property string lidWatchCommand: "prev=\"\"; while :; do cur=open; for f in /proc/acpi/button/lid/*/state; do [ -r \"$f\" ] || continue; grep -q closed \"$f\" && { cur=closed; break; }; done; [ \"$cur\" != \"$prev\" ] && { echo \"$cur\"; prev=\"$cur\"; }; sleep 0.5; done"
+
+  function refreshLid() {
+    if (!lidProbe.running) lidProbe.running = true
+  }
+
+  function applyLidProbe(text) {
+    var values = {}
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var at = lines[i].indexOf("=")
+      if (at > 0) values[lines[i].slice(0, at)] = lines[i].slice(at + 1).trim()
+    }
+    root.hasLid = values.lid === "yes"
+    root.hasLidKnown = true
+    root.lidDropIn = values.dropin === "yes"
+    root.lidDropInKnown = true
+    syncLid()
+  }
+
+  // Brings the drop-in and the wanted state together. Runs the privileged
+  // write at most once per wanted value: a declined prompt or a failed write
+  // is not retried until the switch or the probe result changes, so the user
+  // is never asked twice in a row.
+  function syncLid() {
+    // Readiness and wanted-ness come from the plain properties: bound
+    // properties can still hold their previous value while a change handler
+    // runs, which once left an enable unapplied.
+    var ready = root.hasLidKnown && root.lidDropInKnown
+    var wanted = root.lidStandby && root.hasLid
+    if (!ready) return
+    if (wanted !== root.lidDropIn) {
+      if (root.lidApplyTried !== String(wanted) && !lidLogindProcess.running) {
+        root.lidApplyTried = String(wanted)
+        runProcess(lidLogindProcess, "lid-logind", wanted ? root.lidEnableCommand : root.lidDisableCommand)
+      }
+      return
+    }
+    root.lidApplyTried = ""
+    syncLidWatcher()
+  }
+
+  // The watcher only runs while the service actually owns the lid switch:
+  // wanted and the drop-in confirmed in place. Without the drop-in logind
+  // still suspends on close, so there is nothing to watch for.
+  function syncLidWatcher() {
+    var want = root.lidStandby && root.hasLid && root.lidDropIn
+    if (want === lidStateProcess.running) return
+    if (want) {
+      lidStateProcess.command = ["bash", "-c", root.lidWatchCommand]
+      lidStateProcess.running = true
+      logEvent("lid-watch", "start")
+    } else {
+      lidStateProcess.running = false
+      logEvent("lid-watch", "stop")
+    }
+  }
+
+  function handleLidState(line) {
+    var state = String(line || "").trim()
+    if (state !== "open" && state !== "closed") return
+    if (state === root.lidState) return
+    root.lidState = state
+    logEvent("lid", state)
+    if (state === "closed") standbyDisplays("lid-close")
+    else wakeDisplays("lid-open")
+  }
+
+  function setLidStandby(value) {
+    var enabled = !!value
+    if (root.lidStandby === enabled) return true
+    return mutateIdleConfig("lidStandby " + (enabled ? "on" : "off"), function(idle) { idle.lidStandby = enabled })
+  }
+
+  onLidStandbyChanged: syncLid()
+  onHasLidChanged: syncLid()
+
   // ------------------------------------------------------------ status/IPC
 
   function stageEnabled(name) {
@@ -749,6 +870,12 @@ Item {
         hibernateOnAC: root.hibernateOnAC,
         battery: root.hasBattery,
         when: root.hibernateDelayText
+      },
+      lid: {
+        present: root.hasLid,
+        standby: root.lidStandby,
+        dropIn: root.lidDropIn,
+        state: root.lidState
       },
       idle: root.cycleIdle,
       standbyIdle: root.standbyIdle,
@@ -1240,6 +1367,40 @@ Item {
   }
 
   Process {
+    id: lidProbe
+    command: ["bash", "-c", root.lidProbeCommand]
+    stdout: StdioCollector {
+      onStreamFinished: root.applyLidProbe(this.text)
+    }
+  }
+
+  Process {
+    id: lidLogindProcess
+    onExited: function(exitCode, exitStatus) {
+      root.logEvent("process-exit", "lid-logind exitCode=" + exitCode + " status=" + exitStatus)
+      root.refreshLid()
+    }
+  }
+
+  // Long-running: prints the lid state on every change. The watchdog restarts
+  // it if it dies while wanted, since with the drop-in in place a dead watcher
+  // means closing the lid does nothing at all.
+  Process {
+    id: lidStateProcess
+    stdout: SplitParser {
+      onRead: function(line) { root.handleLidState(line) }
+    }
+    onExited: function(exitCode, exitStatus) { root.logEvent("process-exit", "lid-watch exitCode=" + exitCode + " status=" + exitStatus) }
+  }
+
+  Timer {
+    id: lidWatchdog
+    interval: 5000
+    repeat: true
+    onTriggered: root.syncLidWatcher()
+  }
+
+  Process {
     id: stayAwakeStateProbe
     command: ["bash", "-c", "mkdir -p \"$HOME/.local/state/omarchy/indicators\"; if [[ -f $HOME/.local/state/omarchy/indicators/stay-awake ]]; then echo yes; else echo no; fi"]
     stdout: SplitParser {
@@ -1313,6 +1474,7 @@ Item {
     refreshStayAwakeState()
     refreshScreensaverToggle()
     refreshHibernate()
+    refreshLid()
     screensaverAdoptProbe.running = true
   }
 
@@ -1383,6 +1545,20 @@ Item {
         if (root.setSuspendThenHibernate(want)) state = want
       }
       return (state ? "on" : "off") + (root.canSuspendThenHibernate ? "" : " (not available here, suspends instead)")
+    }
+
+    // omarchy-shell idle lidStandby <on|off|toggle|status>
+    // Laptops only: closing the lid switches the monitors off instead of
+    // suspending. Changing it may ask for administrator approval once.
+    function lidStandby(action: string): string {
+      var act = String(action || "status")
+      if (act !== "on" && act !== "off" && act !== "toggle" && act !== "status") return "unknown action: " + act
+      var state = root.lidStandby
+      if (act !== "status") {
+        var want = act === "toggle" ? !state : act === "on"
+        if (root.setLidStandby(want)) state = want
+      }
+      return state ? "on" : "off"
     }
 
     function hibernate(): string {

@@ -64,6 +64,11 @@ Panel {
   readonly property string hibernateDelayHint: ready ? svc.hibernateDelayHint : ""
   readonly property bool showThenHibernate: thenHibernate || canThenHibernate
   function toggleThenHibernate() { if (ready) svc.setSuspendThenHibernate(!thenHibernate) }
+  // Lid-close standby, laptops only: the row is hidden where the service
+  // finds no lid switch.
+  readonly property bool hasLid: ready && svc.hasLid === true
+  readonly property bool lidStandby: ready ? svc.lidStandby === true : false
+  function toggleLidStandby() { if (ready) svc.setLidStandby(!lidStandby) }
   function screensaverNow() { if (!ready) return; root.close(); svc.startScreensaver("panel") }
   function standbyNow() { if (!ready) return; root.close(); svc.standbyDisplays("panel") }
   function runStageNow(key) {
@@ -139,7 +144,10 @@ Panel {
   onOpenedChanged: {
     keyCatcher.pendingKey = ""
     if (opened) Qt.callLater(function() { keyCatcher.forceActiveFocus() })
-    if (opened && ready) svc.refreshHibernate()
+    if (opened && ready) {
+      svc.refreshHibernate()
+      svc.refreshLid()
+    }
   }
 
   // A key as printed on the keyboard, for the keys the panel answers to.
@@ -378,6 +386,77 @@ Panel {
     }
   }
 
+  // Under the standby row in the Display group, marked ↳ as what the lid does:
+  // closing it switches the monitors off instead of letting logind suspend.
+  // Shown only where the service finds a lid switch. Changing it writes a
+  // logind drop-in, so the tooltip says an approval may be asked.
+  component LidRow: Item {
+    id: lidRow
+    width: parent ? parent.width : 0
+    height: Style.space(44)
+
+    RowLayout {
+      id: lidLayout
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(8) + Style.space(30) + Style.space(8)
+      anchors.rightMargin: Style.space(10)
+      spacing: Style.space(8)
+
+      Row {
+        spacing: 0
+        Layout.fillWidth: true
+        Layout.maximumWidth: implicitWidth
+        Layout.minimumWidth: implicitWidth
+
+        Item {
+          width: numberProbe.implicitWidth
+          height: lidName.implicitHeight
+
+          Text {
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "↳"
+            color: root.lidStandby ? root.foreground : root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.icon
+          }
+        }
+
+        Text {
+          id: lidName
+          text: "On lid close"
+          color: root.lidStandby ? root.foreground : root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Text {
+          id: numberProbe
+          visible: false
+          text: "2  "
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+      }
+
+      Item { Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.horizontalStretchFactor: 0 }
+
+      AccentSwitch {
+        id: lidSwitch
+        checked: root.lidStandby
+        interactive: root.ready
+        foreground: root.foreground
+        onToggled: root.toggleLidStandby()
+
+        PanelToolTip {
+          visible: lidSwitch.containsMouse
+          text: "Closing the lid switches the monitors off instead of suspending. Needs administrator approval to change."
+          fontFamily: root.fontFamily
+        }
+      }
+    }
+  }
+
   component StageGroup: Column {
     id: group
     required property string title
@@ -419,6 +498,11 @@ Panel {
   Component {
     id: thenHibernateRowComponent
     ThenHibernateRow {}
+  }
+
+  Component {
+    id: lidRowComponent
+    LidRow {}
   }
 
   BarIconButton {
@@ -577,6 +661,7 @@ Panel {
           StageGroup {
             title: "Display"
             entries: root.displayStages
+            footer: root.hasLid ? lidRowComponent : null
           }
 
           StageGroup {

@@ -95,6 +95,9 @@ Panel:
   it, which one.
 - Clicking the icon or the name of a stage runs that stage immediately. The
   key beside the name does the same.
+- On laptops, a ↳ "On lid close" row under Standby switches the monitors off
+  when the lid closes instead of suspending (see Behaviour). It is not
+  shown on machines without a lid.
 - The switch at the top toggles stay awake.
 
 Order within a group:
@@ -206,6 +209,33 @@ Then hibernate:
   switches suspend on too; switching suspend off switches it off. If it has gone
   by the time the machine suspends, it just suspends. Applies to "suspend now" too.
 
+Lid close (laptops only):
+
+- The ↳ "On lid close" switch under Standby in the Display group. While it
+  is on, closing the lid switches the monitors off (the same DPMS standby
+  the stage uses) instead of suspending; opening it wakes them.
+- logind cannot switch monitors off, so the plugin takes the lid switch
+  over: it writes `/etc/systemd/logind.conf.d/60-omarchy-power-saving-lid.conf`
+  with `HandleLidSwitch*=ignore` and watches `/proc/acpi/button/lid` itself.
+  Flipping the switch uses passwordless sudo when available and otherwise
+  asks for administrator approval once; logind is reloaded either way.
+  Switching it off removes the file and logind's own
+  suspend-on-close is back. The file it writes:
+
+  ```ini
+  [Login]
+  HandleLidSwitch=ignore
+  HandleLidSwitchExternalPower=ignore
+  HandleLidSwitchDocked=ignore
+  ```
+- If the approval is declined, nothing changes: logind still suspends on
+  close. The `lid.dropIn` field in `idle status` shows whether the plugin
+  actually owns the switch.
+- Idle stages keep running while the lid is closed, so a long enough idle
+  still suspends the machine.
+- Shown only where a lid switch exists; the row and every effect are absent
+  on desktops.
+
 All timeouts count from the moment you went idle. Starting the
 screensaver or locking does not push the later stages back.
 
@@ -247,7 +277,8 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
   "standbyEnabled": true,
   "suspendEnabled": true,
   "hibernateEnabled": false,
-  "suspendThenHibernate": false
+  "suspendThenHibernate": false,
+  "lidStandby": false
 }
 ```
 
@@ -263,6 +294,7 @@ omarchy bar set io.github.selfcrypto.power-saving suspendEnabled true
 | `suspendEnabled` | Suspend stage on or off | `false` |
 | `hibernateEnabled` | Hibernate stage on or off | `false` |
 | `suspendThenHibernate` | Suspend, then hibernate | `false` |
+| `lidStandby` | Closing the lid switches the monitors off instead of suspending (laptops only) | `false` |
 
 The minimum timeout is 10 seconds. The panel and the IPC `timeout` call keep
 the order within a group described above; values written to `shell.json` by
@@ -293,6 +325,7 @@ omarchy-shell idle wake                         # monitors on now
 omarchy-shell idle suspend                      # suspend now
 omarchy-shell idle hibernate                    # hibernate now
 omarchy-shell idle suspendThenHibernate on      # on | off | toggle | status
+omarchy-shell idle lidStandby on                # laptops: lid close -> monitors off, not suspend
 omarchy-shell idle enable | disable | toggle    # stay awake, as in the stock service
 ```
 
@@ -303,8 +336,10 @@ Stage names for `stage` and `timeout` are `screensaver`, `standby`, `lock`,
 
 - Omarchy 4.0.3 or later.
 - Hyprland 0.56 or later for the standby stage.
-- No extra packages, no external services and no privileges beyond the user
-  session.
+- No extra packages and no external services. Everything runs in the user
+  session except the lid-close switch, which writes one logind drop-in
+  after an administrator approval when it is turned on or off (laptops
+  only).
 
 ## Technical notes
 
